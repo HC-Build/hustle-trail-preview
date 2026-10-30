@@ -170,6 +170,7 @@
     }
     app.appendChild(wrap);
     if (window.HT_GUIDE) HT_GUIDE.onScreen("title");
+    if (window.HT_PIXEL) HT_PIXEL.sync(state.run);
   }
 
   function renderSetup() {
@@ -522,6 +523,7 @@
     paintStat("morale", run.morale, 100);
     paintStat("traction", run.traction, 100);
     paintStat("unicorn", run.unicorn || 0, 100);
+    if (window.HT_PIXEL) HT_PIXEL.sync(run);
     var seg = HT.segmentInfo(run.miles);
     var scene = document.getElementById("scene");
     scene.dataset.segment = seg.id;
@@ -1413,6 +1415,7 @@
     var old = document.getElementById("overlay");
     if (old) old.remove();
     renderRecap();
+    if (window.HT_PIXEL) HT_PIXEL.sync(state.run);
     if (window.HT_GUIDE) HT_GUIDE.onRecap(state.run);
     if (state.run.status === "won") fanfare();
     else dirge();
@@ -1557,6 +1560,7 @@
   document.addEventListener("pointerdown", unlock);
 
   try {
+    if (window.HT_PIXEL) HT_PIXEL.mount();
     if (window.HT_GUIDE) {
       HT_GUIDE.mount();
       window.HT_SCENE_PICK = function (hit) {

@@ -26,6 +26,7 @@ html, body {
 }
 
 body {
+  padding-top: 96px;
   font-family: "Avenir Next", "Segoe UI", Helvetica, sans-serif;
   color: var(--ink);
   background:
@@ -428,7 +429,7 @@ input[type="text"] {
 .g-tap { margin: 6px 8px 0; background: var(--rust); color: #1a0d08; border-radius: 999px; min-height: 36px; font-weight: 700; }
 
 body.overlay-open #guide.auto-min {
-  top: 10px; bottom: auto; left: 10px; width: 64px; height: 64px; max-height: 64px;
+  top: 104px; bottom: auto; left: 10px; width: 64px; height: 64px; max-height: 64px;
   border-radius: 50%; overflow: hidden;
 }
 body.overlay-open #guide.auto-min .g-id,
@@ -451,6 +452,56 @@ body.shake { animation: shake 0.4s linear; }
   0%, 100% { box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(240, 195, 106, 0.45); }
   50% { box-shadow: 0 0 0 3px #fff1cc, 0 0 28px rgba(240, 195, 106, 0.95); }
 }
+
+#pixel-trail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 16;
+  padding: 6px 8px 8px;
+  background: rgba(8, 7, 14, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  max-width: 100%;
+}
+#pixel-canvas {
+  width: 100%;
+  height: 56px;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.px-meters {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.px-meter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: #f0c36a;
+}
+.px-meter b { display: flex; gap: 2px; }
+.px-meter i {
+  width: 8px;
+  height: 8px;
+  display: block;
+  background: #2a2438;
+  box-shadow: inset 0 0 0 1px #3a3450;
+}
+.px-meter i.on {
+  background: #f0c36a;
+  box-shadow: 0 0 6px rgba(240, 195, 106, 0.8);
+}
+#px-trc i.on { background: #3ddc97; box-shadow: 0 0 6px rgba(61, 220, 151, 0.7); }
+#px-glo i.on { background: #ff7a45; box-shadow: 0 0 6px rgba(255, 122, 69, 0.75); }
 
 @media (max-width: 860px) {
   .trail { grid-template-columns: minmax(0, 1fr); }
@@ -480,6 +531,10 @@ body.shake { animation: shake 0.4s linear; }
 }
 
 @media (max-width: 380px) {
+  body { padding-top: 88px; }
+  #pixel-canvas { height: 48px; }
+  .px-meter { font-size: 9px; }
+  .px-meter i { width: 6px; height: 6px; }
   .title-screen, .setup-screen, .recap-screen, .trail { width: calc(100% - 12px); }
   .hero, .sheet-card, .card { padding: 14px 12px; border-radius: 16px; }
   .pace, .action { flex: 1 1 calc(50% - 8px); }
