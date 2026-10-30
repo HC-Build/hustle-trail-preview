@@ -40,6 +40,7 @@
 
   function writeBest(record) {
     try { localStorage.setItem(BEST_KEY, JSON.stringify(record)); } catch (e) {}
+    if (window.HT_AUTH && HT_AUTH.signedIn()) HT_AUTH.save({ best: record });
   }
 
   function el(tag, cls, text) {
@@ -286,6 +287,11 @@
 
   function startRun() {
     rememberForm();
+    if (window.HT_AUTH) { HT_AUTH.gate(startRunNow); return; }
+    startRunNow();
+  }
+
+  function startRunNow() {
     clearMinigames();
     state.run = HT.createGame({
       company: state.company,
@@ -448,6 +454,10 @@
     goals.id = "goals";
     sheet.appendChild(goals);
     sheet.appendChild(el("p", "hint", "Quiet Wealth: reach the exit without raising, still holding 68% equity. The bell wants traction of 70. Selling looks respectable at 40% equity."));
+    sheet.appendChild(el("p", "section-label", "Network"));
+    var network = el("ul", "network-list");
+    network.id = "network";
+    sheet.appendChild(network);
     sheet.appendChild(el("p", "section-label", "Team"));
     var team = el("ul", "team");
     team.id = "team";
@@ -484,7 +494,7 @@
     log.appendChild(ol);
     log.setAttribute("aria-live", "polite");
     root.appendChild(log);
-    root.appendChild(el("p", "hints span-2", "Keys: 1 steady, 2 hustle, 3 crunch, R rest, C cold email, U user hunt, P pause, F fast travel, M mute. In an event, 1 to 4 chooses. Space continues."));
+    root.appendChild(el("p", "hints span-2", "Keys: 1 steady, 2 hustle, 3 crunch, R rest, C cold email, U user hunt, P pause, F fast travel, M mute. In an event, 1 to 4 chooses. In a meeting, 1 to 3 chooses. Space continues."));
     app.appendChild(root);
     paintTrail();
     syncOverlay();
@@ -585,6 +595,7 @@
       li.appendChild(el("span", null, "mile " + g.mile));
       goals.appendChild(li);
     });
+    paintNetwork(run);
     var team = document.getElementById("team");
     team.replaceChildren();
     run.cofounders.forEach(function (c) {
@@ -607,6 +618,59 @@
     document.querySelectorAll(".pace").forEach(function (btn) {
       btn.disabled = run.phase !== "travel";
     });
+  }
+
+  function paintNetwork(run) {
+    var list = document.getElementById("network");
+    if (!list || !window.HT_NET) return;
+    HT_NET.ensure(run);
+    list.replaceChildren();
+    var people = run.network.filter(function (p) { return p.met; });
+    if (!people.length) {
+      list.appendChild(el("li", "network-empty", "No one in the network yet. Hard talks and rare nights put people here."));
+      return;
+    }
+    people.forEach(function (p) {
+      var li = el("li", "rel-row" + (p.drama ? " drama" : "") + (p.perk ? " perk" : ""));
+      li.appendChild(portrait(p));
+      var copy = el("div", "rel-copy");
+      copy.appendChild(el("strong", null, p.name));
+      copy.appendChild(el("span", "rel-role", p.role + " · " + HT_NET.levelName(p.trust)));
+      var track = el("div", "rel-track");
+      var fill = el("i");
+      fill.style.width = Math.max(0, Math.min(100, p.trust)) + "%";
+      track.appendChild(fill);
+      copy.appendChild(track);
+      if (p.perk) copy.appendChild(el("span", "rel-note", p.perkText));
+      if (p.drama) copy.appendChild(el("span", "rel-note bad", p.dramaText));
+      li.appendChild(copy);
+      list.appendChild(li);
+    });
+  }
+
+  function portrait(p) {
+    var node = document.createElement("canvas");
+    node.className = "portrait";
+    node.width = 32;
+    node.height = 32;
+    node.setAttribute("aria-hidden", "true");
+    var ctx = node.getContext("2d");
+    if (!ctx) return node;
+    ctx.imageSmoothingEnabled = false;
+    function px(x, y, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * 2, y * 2, w * 2, h * 2);
+    }
+    px(0, 0, 16, 16, "#16122c");
+    px(4, 1, 8, 3, p.hair || "#2a2118");
+    px(3, 3, 10, 2, p.hair || "#2a2118");
+    px(4, 4, 8, 6, "#f4ead7");
+    px(6, 6, 1, 1, "#1a120c");
+    px(9, 6, 1, 1, "#1a120c");
+    px(7, 8, 2, 1, p.drama ? "#9d2218" : "#c4491d");
+    px(3, 11, 10, 5, p.shirt || "#3a3058");
+    px(6, 12, 4, 1, "#f0c36a");
+    return node;
   }
 
   function setText(id, text) {
@@ -936,6 +1000,7 @@
     if (run.phase === "pitch") return "pitch:" + run.day;
     if (run.phase === "hunt") return "hunt:" + run.day + ":" + run.hunts;
     if (run.phase === "scene" && run.scene && run.scene.def) return "scene:" + run.scene.def.id + ":" + run.scene.step;
+    if (run.phase === "meeting" && run.meeting) return "meet:" + run.meeting.def.id + ":" + run.meeting.round + ":" + (run.meeting.done ? "done" : "live");
     return "";
   }
 
@@ -953,6 +1018,7 @@
     if (guide && !open) guide.classList.remove("auto-min");
     if (!key) return;
     if (state.run.phase === "scene") mountScene();
+    else if (state.run.phase === "meeting") mountMeeting();
     else if (state.run.phase === "event") mountEvent();
     else if (state.run.phase === "result") mountResult();
     else if (state.run.phase === "pitch") mountPitch();
@@ -1086,6 +1152,139 @@
     run.scene.juneLine = hit.juneLine;
     run.scene.deltas = out.deltas;
     state.overlayKey = "";
+    afterChange();
+  }
+
+  function mountMeeting() {
+    var run = state.run;
+    var meeting = run.meeting;
+    if (!meeting || !meeting.def) return;
+    var def = meeting.def;
+    var overlay = el("div");
+    overlay.id = "overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    var card = el("section", "card");
+    card.appendChild(el("p", "kicker", def.place || "A meeting"));
+    card.appendChild(el("h2", null, def.title));
+    var who = def.partnerId ? HT_NET.byId(run, def.partnerId) : null;
+    if (def.kind === "meetup" && meeting.done && def.options[meeting.pick] && def.options[meeting.pick].partnerId) {
+      who = HT_NET.byId(run, def.options[meeting.pick].partnerId);
+    }
+    if (who) {
+      var head = el("div", "meet-who");
+      head.appendChild(portrait(who));
+      head.appendChild(el("p", null, who.name + " · " + who.role));
+      card.appendChild(head);
+    }
+    card.appendChild(juneAside(meetingAside(meeting)));
+    if (def.kind === "meeting") {
+      var wrap = el("div", "break-wrap");
+      var lab = el("p", "kicker", "Breakthrough " + meeting.breakthrough);
+      wrap.appendChild(lab);
+      var bar = el("div", "timer");
+      var fill = el("div");
+      fill.style.width = Math.max(0, Math.min(100, meeting.breakthrough)) + "%";
+      bar.appendChild(fill);
+      wrap.appendChild(bar);
+      card.appendChild(wrap);
+    }
+    if (meeting.done) {
+      var pack = def.kind === "meetup" ? null : (meeting.success ? def.success : def.fail);
+      var outcome = def.kind === "meetup"
+        ? def.options[meeting.pick].text
+        : (pack ? pack.text : "");
+      card.appendChild(el("p", "npc-line", outcome));
+      if (pack && pack.teach && !meeting.success) card.appendChild(el("p", "hint", pack.teach));
+      var delta = meetingTrustDelta(meeting);
+      var chips = el("div", "delta-row");
+      chips.appendChild(chip((delta > 0 ? "+" : "") + delta + " rapport", delta >= 0 ? "good" : "bad"));
+      if (meeting.success) chips.appendChild(chip("Breakthrough", "good"));
+      card.appendChild(chips);
+      var back = el("button", "primary", "Back on the trail");
+      back.type = "button";
+      back.addEventListener("click", function () { settleMeeting(); });
+      card.appendChild(back);
+    } else if (def.kind === "meetup") {
+      card.appendChild(el("p", "npc-line", def.line));
+      var picks = el("div", "scene-replies");
+      def.options.forEach(function (opt, index) {
+        var btn = el("button", "choice");
+        btn.type = "button";
+        btn.appendChild(el("span", "choice-label", (index + 1) + ". " + opt.label));
+        if (opt.detail) btn.appendChild(el("span", "choice-detail", opt.detail));
+        btn.addEventListener("click", function () { pickMeeting(index); });
+        picks.appendChild(btn);
+      });
+      card.appendChild(picks);
+    } else {
+      if (meeting.note) card.appendChild(el("p", "hint", meeting.note));
+      var round = def.rounds[meeting.round];
+      card.appendChild(el("p", "npc-line", round.line));
+      var replies = el("div", "scene-replies");
+      round.options.forEach(function (opt, index) {
+        var btn = el("button", "choice");
+        btn.type = "button";
+        btn.appendChild(el("span", "choice-label", (index + 1) + ". " + opt.label));
+        if (opt.detail) btn.appendChild(el("span", "choice-detail", opt.detail));
+        btn.addEventListener("click", function () { pickMeeting(opt.id); });
+        replies.appendChild(btn);
+      });
+      card.appendChild(replies);
+    }
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+
+  function meetingAside(meeting) {
+    var def = meeting.def;
+    if (!meeting.done) return def.brief;
+    if (def.kind === "meetup") {
+      var opt = def.options[meeting.pick];
+      return (opt && opt.june) || def.brief;
+    }
+    if (meeting.success) return "Breakthrough. I felt it and I hate that I felt it.";
+    return (def.fail && def.fail.teach) || "No breakthrough. You still leave with a lesson.";
+  }
+
+  function meetingTrustDelta(meeting) {
+    if (meeting.def.kind === "meetup") {
+      var opt = meeting.def.options[meeting.pick];
+      return opt ? (opt.trust || 0) : 0;
+    }
+    var pack = meeting.success ? meeting.def.success : meeting.def.fail;
+    return (meeting.trustDelta || 0) + ((pack && pack.trust) || 0);
+  }
+
+  function pickMeeting(idOrIndex) {
+    var run = state.run;
+    if (!run || run.phase !== "meeting" || !run.meeting || run.meeting.done) return;
+    if (run.meeting.def.kind === "meetup") HT_NET.chooseMeetup(run, idOrIndex);
+    else HT_NET.chooseMeeting(run, idOrIndex);
+    toneClick();
+    state.overlayKey = "";
+    afterChange();
+  }
+
+  function settleMeeting() {
+    var run = state.run;
+    if (!run || !run.meeting || !run.meeting.done) return;
+    var pack = run.meeting.def.kind === "meetup" ? HT_NET.finishMeetup(run) : HT_NET.finishMeeting(run);
+    var trustOut = pack.partnerId ? HT_NET.applyTrust(run, pack.partnerId, pack.trust) : null;
+    HT.playBeat(run, pack.beat);
+    if (run.status === "playing" && trustOut && trustOut.perk) HT.playBeat(run, trustOut.perk);
+    if (run.status === "playing" && trustOut && trustOut.drama) HT.playBeat(run, trustOut.drama);
+    var line = pack.june || "";
+    if (trustOut && trustOut.perk) line += " Perk unlocked. " + trustOut.perk.text;
+    if (trustOut && trustOut.drama) line += " Gossip, and this one is true. " + trustOut.drama.text;
+    if (window.HT_GUIDE && line) HT_GUIDE.say(line, "june");
+    run.meeting = null;
+    if (run.status === "playing" && run.phase !== "result") {
+      run.blockScenesUntilMile = (run.miles || 0) + 60;
+      run.blockNetworkUntilMile = (run.miles || 0) + 90;
+      run.phase = "travel";
+    }
+    state.overlayKey = "settle";
     afterChange();
   }
 
@@ -1527,7 +1726,22 @@
     }
     if (state.screen !== "trail" || !state.run) return;
     var phase = state.run.phase;
-    if (phase === "scene" && e.key >= "1" && e.key <= "4") {
+    if (phase === "meeting" && state.run.meeting) {
+      if (state.run.meeting.done && (e.key === " " || e.key === "Enter")) {
+        e.preventDefault();
+        settleMeeting();
+      } else if (!state.run.meeting.done && e.key >= "1" && e.key <= "3") {
+        var mi = Number(e.key) - 1;
+        var mdef = state.run.meeting.def;
+        if (mdef.kind === "meetup" && mdef.options[mi]) {
+          e.preventDefault();
+          pickMeeting(mi);
+        } else if (mdef.kind === "meeting") {
+          e.preventDefault();
+          pickMeeting(["listen", "push", "third"][mi]);
+        }
+      }
+    } else if (phase === "scene" && e.key >= "1" && e.key <= "4") {
       var si = Number(e.key) - 1;
       if (state.run.scene && state.run.scene.def && state.run.scene.def.replies[si]) {
         e.preventDefault();
@@ -1574,5 +1788,22 @@
   } catch (err) {
     app.textContent = "The wagon failed to start. Reload the page.";
     console.error(err);
+  }
+})();
+
+// After a magic link return: pull cloud best, push local best, greet.
+(function () {
+  if (!window.HT_AUTH || !HT_AUTH.signedIn()) return;
+  HT_AUTH.load().then(function (row) {
+    try {
+      var key = "hustle-trail-best";
+      var local = JSON.parse(localStorage.getItem(key) || "null");
+      var cloud = row && row.best;
+      if (cloud && (!local || (cloud.score || 0) > (local.score || 0))) localStorage.setItem(key, JSON.stringify(cloud));
+      else if (local) HT_AUTH.save({ best: local });
+    } catch (e) {}
+  });
+  if (HT_AUTH.justSignedIn() && window.HT_GUIDE && HT_GUIDE.say) {
+    try { HT_GUIDE.say("It's official. Unlimited runs, progress saved. Hit start, partner."); } catch (e) {}
   }
 })();

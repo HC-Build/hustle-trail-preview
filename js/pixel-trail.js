@@ -8,7 +8,7 @@
     { id: "vc", mile: 1500, name: "VC office" },
     { id: "unicorn", mile: 2000, name: "Unicorn" }
   ];
-  var view = { miles: 0, runway: 0, traction: 0, unicorn: 0, moving: false };
+  var view = { miles: 0, runway: 0, traction: 0, unicorn: 0, partners: 0, moving: false };
   var canvas;
   var ctx;
   var raf = 0;
@@ -23,12 +23,45 @@
       + meter("run", "Run")
       + meter("trc", "Trac")
       + meter("glo", "Glow")
+      + "<div class='px-meter px-net'><canvas id='px-net-icon' width='8' height='8' aria-hidden='true'></canvas><span>Net</span><b id='px-net'>0</b></div>"
       + "</div>";
     document.body.prepend(bar);
+    paintNetIcon();
     canvas = document.getElementById("pixel-canvas");
     ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     if (!raf) raf = requestAnimationFrame(frame);
+  }
+
+  function paintNetIcon() {
+    var icon = document.getElementById("px-net-icon");
+    if (!icon) return;
+    var c = icon.getContext("2d");
+    c.imageSmoothingEnabled = false;
+    function p(x, y, color) {
+      c.fillStyle = color;
+      c.fillRect(x, y, 1, 1);
+    }
+    p(3, 0, "#2a2118");
+    p(4, 0, "#2a2118");
+    p(2, 1, "#2a2118");
+    p(3, 1, "#f4ead7");
+    p(4, 1, "#f4ead7");
+    p(5, 1, "#2a2118");
+    p(3, 2, "#1a120c");
+    p(4, 2, "#1a120c");
+    p(2, 3, "#f4ead7");
+    p(5, 3, "#f4ead7");
+    p(2, 4, "#ff7a45");
+    p(3, 4, "#ff7a45");
+    p(4, 4, "#ff7a45");
+    p(5, 4, "#ff7a45");
+    p(3, 5, "#ff7a45");
+    p(4, 5, "#ff7a45");
+    p(3, 6, "#1a120c");
+    p(4, 6, "#1a120c");
+    p(2, 7, "#f4ead7");
+    p(5, 7, "#f4ead7");
   }
 
   function meter(id, label) {
@@ -44,7 +77,9 @@
       view.runway = 0;
       view.traction = 0;
       view.unicorn = 0;
+      view.partners = 0;
       view.moving = false;
+      paintMeters();
       return;
     }
     var miles = Math.max(0, Math.min(2000, game.miles || 0));
@@ -53,6 +88,7 @@
     view.runway = game.runway || 0;
     view.traction = game.traction || 0;
     view.unicorn = game.unicorn || 0;
+    view.partners = root.HT_NET && root.HT_NET.metCount ? root.HT_NET.metCount(game) : 0;
     paintMeters();
   }
 
@@ -60,6 +96,8 @@
     fill("px-run", view.runway / 100);
     fill("px-trc", Math.min(1, view.traction / 80));
     fill("px-glo", (view.unicorn || 0) / 100);
+    var net = document.getElementById("px-net");
+    if (net) net.textContent = String(view.partners || 0);
   }
 
   function fill(id, ratio) {

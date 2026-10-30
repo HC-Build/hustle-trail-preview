@@ -11,7 +11,7 @@
 
   // Set this to the deployed proxy (see /proxy). Empty keeps scripted June.
 // Never put an API key here.
-var PROXY_URL = "";
+var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
   var modelEndpoint = PROXY_URL;
 
   var RUMORS = {
@@ -414,8 +414,11 @@ var PROXY_URL = "";
       (game.company || "The company") + " rolls on. Try to be a person the team can text back."
     ];
     if (memory.grudge > 0) lines.push("I have not forgotten the spicy choice. I am just letting the scenery do some of the lecture.");
-    if (game.story && game.story.glassbird) lines.push("Glassbird is still out there being Glassbird. We will hear from them when it is least convenient.");
-    return lines[Math.abs(game.day) % lines.length];
+      if (game.story && game.story.glassbird) lines.push("Glassbird is still out there being Glassbird. We will hear from them when it is least convenient.");
+      (game.network || []).forEach(function (p) {
+        if (p.drama && p.dramaText) lines.push("Gossip, and I am not inventing this one. " + p.dramaText);
+      });
+      return lines[Math.abs(game.day) % lines.length];
   }
 
   function pickRumorId(game, memory) {
@@ -641,8 +644,17 @@ var PROXY_URL = "";
       phase: game.phase,
       story: game.story || {},
       flags: game.flags || {},
+      network: (game.network || []).map(function (p) {
+        return { name: p.name, role: p.role, trust: p.trust, met: p.met, perk: p.perk };
+      }),
       scene: game.scene && game.scene.def ? game.scene.def.id : null,
-      event: game.pending ? game.pending.title : null
+      event: game.pending ? game.pending.title : null,
+      meeting: game.meeting && game.meeting.def ? {
+        id: game.meeting.def.id,
+        round: game.meeting.round,
+        breakthrough: game.meeting.breakthrough,
+        done: !!game.meeting.done
+      } : null
     };
   }
 
@@ -733,6 +745,18 @@ var PROXY_URL = "";
         game.scene = { def: scene, step: "live", voicedNpc: false };
         say(scene.brief, "june", { interrupt: true });
         return;
+      }
+      var host = typeof window !== "undefined" ? window : globalThis;
+      if (host.HT_NET && host.HT_NET.next) {
+        var enc = host.HT_NET.next(game);
+        if (enc) {
+          game.networkSeen = game.networkSeen || [];
+          game.networkSeen.push(enc.id);
+          game.phase = "meeting";
+          game.meeting = host.HT_NET.begin(enc);
+          say(enc.brief, "june", { interrupt: true });
+          return;
+        }
       }
       warn(game);
       if (game.day > 1 && game.day % 6 === 0 && memory.barkDay !== game.day) {
@@ -1069,6 +1093,7 @@ var PROXY_URL = "";
 
   function endSceneTravel(game) {
     game.blockScenesUntilMile = (game.miles || 0) + 70;
+    game.blockNetworkUntilMile = (game.miles || 0) + 50;
     game.phase = "travel";
     game.scene = null;
   }
@@ -1086,6 +1111,7 @@ var PROXY_URL = "";
     briefEvent: briefEvent,
     reactResult: reactResult,
     recapLine: recapLine,
+    snapshot: snapshot,
     sideQuestLine: sideQuestLine,
     rateComment: rateComment,
     styleForClip: styleForClip,
