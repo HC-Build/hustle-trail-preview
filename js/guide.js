@@ -6,12 +6,13 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.HT_GUIDE = api;
 })(typeof window !== "undefined" ? window : globalThis, function (SCENES) {
+  var host = typeof window !== "undefined" ? window : globalThis;
   var NAME = "June Harlow";
   var ROLE = "Trail boss";
 
-  // Set this to the deployed proxy (see /proxy). Empty keeps scripted June.
-// Never put an API key here.
-var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
+  // June's relay. The publishable key is the same one auth.js uses. Never put a secret here.
+  var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
+  var JUNE_ANON = "sb_publishable_Qr4hcgBR728ZfSHoVomKqg_qo4moCXC";
   var modelEndpoint = PROXY_URL;
 
   var RUMORS = {
@@ -112,21 +113,47 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     };
   }
 
+  function parseJune(data) {
+    if (!data) return null;
+    if (typeof data === "string") return cleanLine(data);
+    var text = data.text || data.reply || data.content || data.output || null;
+    if (text && typeof text === "object") text = text.content || text.text || null;
+    if (!text && data.choices && data.choices[0] && data.choices[0].message) text = data.choices[0].message.content;
+    if (!text && typeof data.message === "string") text = data.message;
+    return cleanLine(text);
+  }
+
+  function cleanLine(text) {
+    if (typeof text !== "string") return null;
+    var out = text.replace(/[\u2013\u2014]/g, ",").trim();
+    return out || null;
+  }
+
   function askModel(payload) {
     if (!modelEndpoint || typeof fetch !== "function") return Promise.resolve(null);
+    var body = {
+      message: String((payload && (payload.message || payload.text)) || "").slice(0, 500),
+      state: (payload && payload.state) || {},
+      memory: (payload && payload.memory) || []
+    };
+    var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 12000);
+    var headers = { "Content-Type": "application/json", "apikey": JUNE_ANON, "Authorization": "Bearer " + JUNE_ANON };
     return fetch(modelEndpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: headers,
+      body: JSON.stringify(body),
+      signal: ctrl ? ctrl.signal : undefined
     }).then(function (res) {
+      clearTimeout(timer);
       if (!res.ok) return null;
-      return res.json();
+      return res.json().catch(function () { return null; });
     }).then(function (data) {
-      if (!data) return null;
-      var text = data.text || data.reply || data.message || null;
-      if (typeof text !== "string") return null;
-      return text.replace(/[\u2013\u2014]/g, ",");
-    }).catch(function () { return null; });
+      return parseJune(data);
+    }).catch(function () {
+      clearTimeout(timer);
+      return null;
+    });
   }
 
   function aliveCount(game) {
@@ -563,6 +590,11 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
   }
 
   function showTap() {
+    if (userActivated) {
+      var status = document.getElementById("guide-micstatus");
+      if (status && status.dataset.state !== "listening") status.textContent = "Voice is blocked. June still types.";
+      return;
+    }
     var node = document.getElementById("guide-tap");
     if (node) node.hidden = false;
   }
@@ -607,7 +639,10 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     if (opts && opts.interrupt) stopTalking();
     logLine(who || "june", text);
     paintMood();
-    enqueueSpeak(text, who || "june");
+    if (who === "june" || !who) {
+      try { if (typeof host.HT_JUNE_ECHO === "function") host.HT_JUNE_ECHO(text); } catch (e) {}
+    }
+    try { enqueueSpeak(text, who || "june"); } catch (e) { showTap(); }
     var rumorRow = document.getElementById("guide-rumor");
     if (rumorRow) rumorRow.hidden = !memory.openRumor;
   }
@@ -660,7 +695,7 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
 
   function ctxFrom(game) {
     var nextGoal = null;
-    if (game && root.HT && root.HT.nextMilestone) nextGoal = root.HT.nextMilestone(game);
+    if (game && host.HT && host.HT.nextMilestone) nextGoal = host.HT.nextMilestone(game);
     return {
       game: game,
       memory: memory,
@@ -701,14 +736,14 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
   }
 
   function actRumor(action) {
-    if (!memory.openRumor || !bound || !root.HT || !root.HT.playBeat) return;
+    if (!memory.openRumor || !bound || !host.HT || !host.HT.playBeat) return;
     var rolled = rumorBeat(memory.openRumor, action);
     memory.openRumor = null;
     paintRumor();
-    var out = root.HT.playBeat(bound, rolled.beat);
+    host.HT.playBeat(bound, rolled.beat);
     noteChoice(rolled.beat.choice, action === "leave" ? "meh" : "meh");
     say(rolled.juneLine, "june");
-    if (root.HT_UI_AFTER) root.HT_UI_AFTER();
+    if (host.HT_UI_AFTER) host.HT_UI_AFTER();
   }
 
   function onRun(game) {
@@ -753,8 +788,8 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
           game.networkSeen = game.networkSeen || [];
           game.networkSeen.push(enc.id);
           game.phase = "meeting";
-          game.meeting = host.HT_NET.begin(enc);
-          say(enc.brief, "june", { interrupt: true });
+          game.meeting = host.HT_NET.begin(game, enc);
+          say(game.meeting.def.brief, "june", { interrupt: true });
           return;
         }
       }
@@ -829,31 +864,53 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     if (scene.def && scene.def.line) say(scene.def.line, scene.def.npc.voice);
   }
 
+  var LOST_LINE = "I lost that thought. Ask me again. The wagon is still moving.";
+
+  function routeSceneText(game, text) {
+    if (!(game && game.phase === "scene" && game.scene && game.scene.step === "live" && SCENES && SCENES.interpret)) {
+      return { mode: "talk" };
+    }
+    var hit = SCENES.interpret(game.scene.def, text);
+    if (hit && hit.index != null) return { mode: "pick", hit: hit };
+    return { mode: "talk" };
+  }
+
+  function scriptedAnswer(value, ctx) {
+    try {
+      var line = reply(value, ctx);
+      if (line) return line;
+    } catch (e) {}
+    return LOST_LINE;
+  }
+
   function sendText(text) {
-    var value = String(text || "").trim();
+    var value = String(text || "").trim().slice(0, 500);
     if (!value) return;
     logLine("you", value);
     var game = bound;
-    if (game && game.phase === "scene" && game.scene && game.scene.step === "live" && SCENES.interpret) {
-      var hit = SCENES.interpret(game.scene.def, value);
-      if (root.HT_SCENE_PICK) {
-        root.HT_SCENE_PICK(hit);
-        return;
-      }
+    var routed = routeSceneText(game, value);
+    if (routed.mode === "pick" && host.HT_SCENE_PICK) {
+      host.HT_SCENE_PICK(routed.hit);
+      return;
     }
-    var ctx = ctxFrom(game);
-    askModel({
-      speaker: "player",
-      message: value,
-      guide: NAME,
-      state: snapshot(game),
-      memory: memory.notes.slice(-6)
-    }).then(function (modelText) {
+    var ctx;
+    try { ctx = ctxFrom(game); } catch (e) { ctx = { game: game, memory: memory }; }
+    var payload;
+    try {
+      payload = {
+        message: value,
+        state: snapshot(game),
+        memory: memory.notes.slice(-6)
+      };
+    } catch (e) {
+      payload = { message: value, state: {}, memory: [] };
+    }
+    askModel(payload).then(function (modelText) {
       if (modelText) {
         say(modelText, "june");
         return;
       }
-      var line = reply(value, ctx);
+      var line = scriptedAnswer(value, ctx);
       if (line === "STORY_RUMOR") {
         var id = pickRumorId(game || { day: 1 }, memory);
         var truth = game && game.rng ? game.rng() < 0.5 : Math.random() < 0.5;
@@ -862,6 +919,8 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
         return;
       }
       say(line, "june");
+    }).catch(function () {
+      say(LOST_LINE, "june");
     });
   }
 
@@ -898,7 +957,7 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
       + "</div>"
       + "<form class='g-form' id='guide-form'>"
       + "<button type='button' id='guide-mic' aria-label='Talk to June'>Mic</button>"
-      + "<input id='guide-input' type='text' maxlength='160' placeholder='Talk to June' autocomplete='off'>"
+      + "<div class='g-field'><input id='guide-input' type='text' maxlength='500' placeholder='Talk to June' autocomplete='off'><span class='g-count' id='guide-count'>0/500</span></div>"
       + "<button type='submit'>Send</button>"
       + "</form>"
       + "<p class='g-micstatus' id='guide-micstatus'></p>";
@@ -940,12 +999,16 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
       primeFromGesture();
       if (memory.lastJune) enqueueSpeak(memory.lastJune, "june");
     });
+    var guideInput = document.getElementById("guide-input");
+    guideInput.addEventListener("input", refreshGuideCount);
     document.getElementById("guide-form").addEventListener("submit", function (e) {
       e.preventDefault();
       primeFromGesture();
+      hideTap();
       var input = document.getElementById("guide-input");
       var value = input.value;
       input.value = "";
+      refreshGuideCount();
       sendText(value);
     });
     document.getElementById("rumor-act").addEventListener("click", function () { primeFromGesture(); actRumor("act"); });
@@ -955,11 +1018,42 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     document.addEventListener("pointerdown", primeFromGesture);
   }
 
+  function refreshGuideCount() {
+    var input = document.getElementById("guide-input");
+    var count = document.getElementById("guide-count");
+    if (!input || !count) return;
+    if (input.value.length > 500) input.value = input.value.slice(0, 500);
+    var n = input.value.length;
+    count.textContent = n + "/500";
+    count.classList.toggle("hot", n >= 450);
+  }
+
+  function micErrorMessage(err) {
+    var name = err && (err.name || err.error);
+    if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError" || name === "not-allowed" || name === "service-not-allowed") {
+      return "Microphone blocked. Allow it in the browser, or type.";
+    }
+    if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError" || name === "audio-capture") {
+      return "No microphone found. Type instead.";
+    }
+    return "Microphone did not start. Type instead.";
+  }
+
+  function ensureMic() {
+    var media = typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    if (!media) return Promise.reject({ name: "NotFoundError" });
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      return true;
+    });
+  }
+
   function wireMic() {
     var btn = document.getElementById("guide-mic");
     var status = document.getElementById("guide-micstatus");
     var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
     var session = 0;
+    var boot = 0;
     var active = null;
     var stopping = false;
 
@@ -993,11 +1087,16 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     }
 
     if (!Rec) {
-      setMic("error", "Mic is not in this browser. Type it.");
+      setMic("error", "This browser cannot turn speech into text. Type instead.");
       btn.addEventListener("click", function () {
+        primeFromGesture();
         var input = document.getElementById("guide-input");
         if (input) input.focus();
-        setMic("error", "Mic is not in this browser. Type it.");
+        ensureMic().then(function () {
+          setMic("error", "This browser can hear you, but not turn it into text. Type instead.");
+        }).catch(function (err) {
+          setMic("error", micErrorMessage(err));
+        });
       });
       return;
     }
@@ -1005,9 +1104,29 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     setMic("idle", "Mic idle");
 
     function begin() {
+      var ticket = ++boot;
+      if (active) {
+        stopping = true;
+        try { active.onend = null; active.onerror = null; active.onresult = null; } catch (e) {}
+        try { active.abort(); } catch (e2) {}
+        active = null;
+        releaseMic();
+      }
+      setMic("listening", "Asking for the microphone");
+      ensureMic().then(function () {
+        if (ticket !== boot) return;
+        openRec();
+      }).catch(function (err) {
+        if (ticket !== boot) return;
+        releaseMic();
+        setMic("error", micErrorMessage(err));
+      });
+    }
+
+    function openRec() {
       var rec;
       try { rec = new Rec(); } catch (e) {
-        setMic("error", "Mic would not start. Type it.");
+        setMic("error", "Microphone did not start. Type instead.");
         return;
       }
       var mine = ++session;
@@ -1029,7 +1148,10 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
           if (event.results[i].isFinal) finalText = (finalText + " " + event.results[i][0].transcript).trim();
         }
         var input = document.getElementById("guide-input");
-        if (input) input.value = finalText || text;
+        if (input) {
+          input.value = (finalText || text || "").slice(0, 500);
+          refreshGuideCount();
+        }
       };
       rec.onerror = function (event) {
         if (mine !== session) return;
@@ -1037,10 +1159,13 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
         if (code === "aborted" || code === "no-speech") return;
         if (code === "not-allowed" || code === "service-not-allowed") {
           hardError = true;
-          setMic("error", "Mic is blocked. Type instead.");
+          setMic("error", "Microphone blocked. Allow it in the browser, or type.");
+        } else if (code === "audio-capture") {
+          hardError = true;
+          setMic("error", "No microphone found. Type instead.");
         } else {
           hardError = true;
-          setMic("error", "Mic error. Type instead.");
+          setMic("error", micErrorMessage({ name: code }));
         }
       };
       rec.onend = function () {
@@ -1072,7 +1197,7 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
         try { rec.abort(); } catch (e2) {}
         active = null;
         releaseMic();
-        setMic("error", "Mic was busy. Tap again.");
+        setMic("error", "Microphone was busy. Tap again.");
       }
     }
 
@@ -1080,6 +1205,7 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
       primeFromGesture();
       if (recOn && active) {
         stopping = true;
+        boot += 1;
         session += 1;
         try { active.abort(); } catch (e) { try { active.stop(); } catch (e2) {} }
         active = null;
@@ -1112,6 +1238,22 @@ var PROXY_URL = "https://ycdbntuojctiruqkqiwt.supabase.co/functions/v1/june";
     reactResult: reactResult,
     recapLine: recapLine,
     snapshot: snapshot,
+    parseJune: parseJune,
+    routeSceneText: routeSceneText,
+    scriptedAnswer: scriptedAnswer,
+    exportMemory: function () {
+      try { return JSON.parse(JSON.stringify(memory)); } catch (e) { return null; }
+    },
+    importMemory: function (next) {
+      if (!next || typeof next !== "object") return;
+      memory = next;
+      paintMood();
+    },
+    attach: function (game, nextMemory) {
+      bound = game;
+      if (nextMemory) memory = nextMemory;
+      paintMood();
+    },
     sideQuestLine: sideQuestLine,
     rateComment: rateComment,
     styleForClip: styleForClip,

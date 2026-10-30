@@ -407,6 +407,7 @@ input[type="text"] {
 .g-line.you { color: #b8ffd8; }
 .g-line.npc { color: #d5def5; }
 .g-quick, .g-rumor { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px; }
+.g-rumor[hidden], .g-tap[hidden] { display: none; }
 .g-quick button, .g-rumor button, .g-form button {
   background: rgba(255, 255, 255, 0.05);
   color: var(--ink);
@@ -416,11 +417,19 @@ input[type="text"] {
   min-height: 36px;
   font-size: 0.8rem;
 }
-.g-form { display: flex; gap: 6px; padding: 0 8px 8px; }
-.g-form input {
-  flex: 1; min-width: 0; border-radius: 12px; border: 1px solid var(--line);
-  padding: 8px 10px; font-size: 16px; background: rgba(0, 0, 0, 0.35); color: var(--ink);
+.g-form { display: flex; gap: 6px; padding: 0 8px 8px; align-items: center; }
+.g-field { position: relative; flex: 1; min-width: 0; }
+.g-form input, .g-field input {
+  width: 100%; min-width: 0; border-radius: 12px; border: 1px solid var(--line);
+  padding: 8px 54px 8px 10px; font-size: 16px; background: rgba(0, 0, 0, 0.35); color: var(--ink);
 }
+.g-count {
+  position: absolute; right: 8px; bottom: 7px;
+  font-size: 0.68rem; color: var(--ink-soft); pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.g-count.hot { color: #ffb1a8; }
+.modal-june { margin: 8px 0 0; color: #ffd7a8; font-size: 0.92rem; }
 #guide-mic[data-state="listening"] { background: #c2410c; color: white; border-color: transparent; }
 #guide-mic[data-state="error"] { background: #6d221c; color: #ffd0c8; }
 .g-micstatus { margin: 0; padding: 0 10px 8px; font-size: 0.75rem; color: var(--ink-soft); }
@@ -442,7 +451,19 @@ body.overlay-open #guide.auto-min .g-rumor,
 body.overlay-open #guide.auto-min .g-micstatus,
 body.overlay-open #guide.auto-min .g-tap { display: none; }
 body.overlay-open #guide.auto-min .g-head { display: flex; padding: 0; background: transparent; }
-body.overlay-open #guide:not(.auto-min) { top: 8px; bottom: auto; max-height: 32vh; z-index: 25; }
+body.overlay-open #guide:not(.min) {
+  top: 8px;
+  bottom: auto;
+  left: 8px;
+  right: 8px;
+  width: auto;
+  max-height: 36vh;
+  z-index: 30;
+}
+body.overlay-open #guide:not(.min) .g-quick { display: none; }
+body.overlay-open #guide:not(.min) .g-log { min-height: 40px; }
+body.overlay-open #overlay { z-index: 20; padding-top: 38vh; }
+body.overlay-open .card { max-height: 56vh; }
 
 body.shake { animation: shake 0.4s linear; }
 @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
@@ -561,6 +582,15 @@ body.shake { animation: shake 0.4s linear; }
     max-height: 32vh;
   }
   #guide.min, body.overlay-open #guide.auto-min { right: auto; width: 64px; bottom: auto; }
+  body.overlay-open #guide:not(.min) {
+    top: 6px;
+    bottom: auto;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 34vh;
+    z-index: 30;
+  }
   body.guide-open .trail { padding-bottom: 8px; }
 }
 
@@ -575,11 +605,6 @@ body.shake { animation: shake 0.4s linear; }
   #guide { bottom: calc(188px + env(safe-area-inset-bottom)); max-height: 28vh; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .wagon.moving, body.shake, .g-avatar.talking, .hero, .card, #guide { animation: none; }
-}
-
-/* Sign-in gate */
 .ht-gate { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(6, 8, 18, 0.72); backdrop-filter: blur(8px); }
 .ht-gate-card { width: 100%; max-width: 420px; padding: 24px; border-radius: 18px; background: linear-gradient(160deg, rgba(40, 32, 70, 0.95), rgba(14, 16, 32, 0.95)); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 0 40px rgba(170, 120, 255, 0.25); color: #f3efff; }
 .ht-gate-who { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-bottom: 8px; }
@@ -588,3 +613,8 @@ body.shake { animation: shake 0.4s linear; }
 .ht-gate-form input { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.06); color: inherit; font-size: 16px; }
 .ht-gate-note { font-size: 13px; opacity: 0.75; margin: 12px 0 0; min-height: 1em; }
 .ht-gate-close { margin-top: 10px; width: 100%; }
+body.overlay-open #guide.min { z-index: 30; top: 8px; bottom: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wagon.moving, body.shake, .g-avatar.talking, .hero, .card, #guide { animation: none; }
+}

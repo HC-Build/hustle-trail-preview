@@ -3,7 +3,7 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.HT_DATA = api;
 })(typeof window !== "undefined" ? window : globalThis, function () {
-  var NAMES = ["Jane", "Alex", "Sam", "Taylor", "Jordan", "Riley", "Casey", "Morgan", "Avery", "Quinn", "Reese", "Drew"];
+  var NAMES = ["Jane", "Taylor", "Riley", "Morgan", "Avery", "Quinn", "Reese", "Drew", "Harper", "Mina", "Jules", "Sasha"];
 
   var TRAITS = [
     { id: "shipper", name: "Ships on Friday", blurb: "Breakdowns cost less runway." },

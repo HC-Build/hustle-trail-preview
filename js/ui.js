@@ -38,9 +38,47 @@
     }
   }
 
+  var RUN_KEY = "hustle-trail-run";
+
   function writeBest(record) {
     try { localStorage.setItem(BEST_KEY, JSON.stringify(record)); } catch (e) {}
     if (window.HT_AUTH && HT_AUTH.signedIn()) HT_AUTH.save({ best: record });
+  }
+
+  function readSavedRun() {
+    try {
+      var data = JSON.parse(localStorage.getItem(RUN_KEY) || "null");
+      if (!data || !data.run) return null;
+      var run = HT.unpackRun(data.run);
+      if (!run) return null;
+      data.run = run;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearRun() {
+    try { localStorage.removeItem(RUN_KEY); } catch (e) {}
+  }
+
+  function saveRun() {
+    if (!state.run || state.run.status !== "playing") {
+      if (state.run && state.run.status && state.run.status !== "playing") clearRun();
+      return;
+    }
+    try {
+      localStorage.setItem(RUN_KEY, JSON.stringify({
+        version: 1,
+        run: HT.packRun(state.run),
+        memory: window.HT_GUIDE && HT_GUIDE.exportMemory ? HT_GUIDE.exportMemory() : null,
+        difficulty: state.difficulty,
+        company: state.company,
+        pitchLine: state.pitchLine,
+        warmIntro: !!state.warmIntro,
+        speed: state.speed
+      }));
+    } catch (e) {}
   }
 
   function el(tag, cls, text) {
@@ -160,7 +198,17 @@
     how.addEventListener("click", function () { state.helpOpen = !state.helpOpen; renderTitle(); });
     row.appendChild(start);
     row.appendChild(how);
+    var parked = readSavedRun();
+    if (parked) {
+      var resume = el("button", "ghost", "Resume run");
+      resume.type = "button";
+      resume.addEventListener("click", function () { unlock(); resumeRun(); });
+      row.appendChild(resume);
+    }
     hero.appendChild(row);
+    if (parked) {
+      hero.appendChild(el("p", "hint", parked.run.company + " is parked at mile " + Math.round(parked.run.miles) + ", day " + parked.run.day + "."));
+    }
     wrap.appendChild(hero);
     if (state.helpOpen) {
       var help = el("section", "help");
@@ -318,6 +366,28 @@
     startLoop();
     toneClick();
     if (window.HT_GUIDE) HT_GUIDE.onRun(state.run);
+    saveRun();
+  }
+
+  function resumeRun() {
+    var saved = readSavedRun();
+    if (!saved) return;
+    clearMinigames();
+    state.run = saved.run;
+    state.company = saved.company || saved.run.company;
+    state.pitchLine = saved.pitchLine || saved.run.pitchLine;
+    state.difficulty = saved.difficulty || saved.run.difficulty;
+    state.warmIntro = !!saved.warmIntro;
+    state.speed = saved.speed === 2 ? 2 : 1;
+    state.overlayKey = "resume";
+    state.screen = "trail";
+    renderTrail();
+    startLoop();
+    if (window.HT_GUIDE) {
+      HT_GUIDE.attach(state.run, saved.memory);
+      HT_GUIDE.say("You reloaded. I kept the miles. The wagon does not care about your refresh button.", "june");
+    }
+    saveRun();
   }
 
   function startLoop() {
@@ -618,6 +688,7 @@
     document.querySelectorAll(".pace").forEach(function (btn) {
       btn.disabled = run.phase !== "travel";
     });
+    saveRun();
   }
 
   function paintNetwork(run) {
@@ -1014,8 +1085,7 @@
     var open = !!key;
     document.body.classList.toggle("overlay-open", open);
     var guide = document.getElementById("guide");
-    if (guide && open) guide.classList.add("auto-min");
-    if (guide && !open) guide.classList.remove("auto-min");
+    if (guide) guide.classList.remove("auto-min");
     if (!key) return;
     if (state.run.phase === "scene") mountScene();
     else if (state.run.phase === "meeting") mountMeeting();
@@ -1030,6 +1100,45 @@
     row.innerHTML = window.HT_GUIDE ? HT_GUIDE.avatarSvg() : "";
     row.appendChild(el("p", null, text));
     return row;
+  }
+
+  function talkField(placeholder) {
+    var form = el("form", "g-form");
+    var mic = el("button", null, "Mic");
+    mic.type = "button";
+    mic.addEventListener("click", function () {
+      var real = document.getElementById("guide-mic");
+      if (real) real.click();
+    });
+    var field = el("div", "g-field");
+    var input = el("input");
+    input.type = "text";
+    input.maxLength = 500;
+    input.placeholder = placeholder;
+    var count = el("span", "g-count", "0/500");
+    input.addEventListener("input", function () {
+      if (input.value.length > 500) input.value = input.value.slice(0, 500);
+      count.textContent = input.value.length + "/500";
+      count.classList.toggle("hot", input.value.length >= 450);
+    });
+    field.appendChild(input);
+    field.appendChild(count);
+    var send = el("button", null, "Send");
+    send.type = "submit";
+    form.appendChild(mic);
+    form.appendChild(field);
+    form.appendChild(send);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var text = input.value;
+      input.value = "";
+      count.textContent = "0/500";
+      count.classList.remove("hot");
+      if (window.HT_GUIDE) HT_GUIDE.sendText(text);
+    });
+    var echo = el("p", "modal-june");
+    echo.id = "modal-june";
+    return { form: form, echo: echo };
   }
 
   function mountScene() {
@@ -1071,29 +1180,9 @@
         replies.appendChild(btn);
       });
       card.appendChild(replies);
-      var form = el("form", "g-form");
-      var mic = el("button", null, "Mic");
-      mic.type = "button";
-      mic.addEventListener("click", function () {
-        var real = document.getElementById("guide-mic");
-        if (real) real.click();
-      });
-      var input = el("input");
-      input.type = "text";
-      input.maxLength = 160;
-      input.placeholder = "Or say it your way";
-      var send = el("button", null, "Send");
-      send.type = "submit";
-      form.appendChild(mic);
-      form.appendChild(input);
-      form.appendChild(send);
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var text = input.value;
-        input.value = "";
-        if (window.HT_GUIDE) HT_GUIDE.sendText(text);
-      });
-      card.appendChild(form);
+      var talk = talkField("Or say it your way");
+      card.appendChild(talk.form);
+      card.appendChild(talk.echo);
     }
     overlay.appendChild(card);
     document.body.appendChild(overlay);
@@ -1232,6 +1321,9 @@
       });
       card.appendChild(replies);
     }
+    var meetTalk = talkField("Or say it your way");
+    card.appendChild(meetTalk.form);
+    card.appendChild(meetTalk.echo);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
   }
@@ -1347,6 +1439,9 @@
       choices.appendChild(btn);
     });
     card.appendChild(choices);
+    var talk = talkField("Or say it your way");
+    card.appendChild(talk.form);
+    card.appendChild(talk.echo);
     overlay.appendChild(card);
     document.body.appendChild(overlay);
     var first = choices.querySelector("button");
@@ -1609,6 +1704,7 @@
       state.best = record;
       writeBest(record);
     }
+    clearRun();
     state.screen = "recap";
     state.overlayKey = "";
     var old = document.getElementById("overlay");
@@ -1777,6 +1873,10 @@
     if (window.HT_PIXEL) HT_PIXEL.mount();
     if (window.HT_GUIDE) {
       HT_GUIDE.mount();
+      window.HT_JUNE_ECHO = function (text) {
+        var slot = document.getElementById("modal-june");
+        if (slot) slot.textContent = "June: " + text;
+      };
       window.HT_SCENE_PICK = function (hit) {
         if (!hit) return;
         if (hit.index != null) chooseScene(hit.index);

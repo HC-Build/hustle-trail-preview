@@ -425,16 +425,50 @@
     return list[list.length - 1];
   }
 
+  function partyText(game, text) {
+    if (typeof text !== "string") return text;
+    var live = ((game && game.cofounders) || []).filter(function (c) { return c && c.alive !== false && c.name; }).map(function (c) { return c.name; });
+    var a = live[0] || "your cofounder";
+    var b = live[1] || a;
+    var c = live[2] || b;
+    return text.replace(/\{p1\}/g, a).replace(/\{p2\}/g, b).replace(/\{p3\}/g, c);
+  }
+
+  function partyFill(game, value) {
+    if (typeof value === "string") return partyText(game, value);
+    if (Array.isArray(value)) return value.map(function (item) { return partyFill(game, item); });
+    if (value && typeof value === "object") {
+      var out = {};
+      Object.keys(value).forEach(function (k) {
+        if (typeof value[k] === "function") out[k] = value[k];
+        else out[k] = partyFill(game, value[k]);
+      });
+      return out;
+    }
+    return value;
+  }
+
+  function packRun(game) {
+    return JSON.parse(JSON.stringify(game));
+  }
+
+  function unpackRun(data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    if (typeof data.miles !== "number" || data.status !== "playing") return null;
+    data.rng = Math.random;
+    return data;
+  }
+
   function materialize(def, game) {
     var built = def.build ? def.build(game, game.rng) : {};
     var text = built.text || def.text;
     if (typeof text === "function") text = text(game, game.rng);
     return {
       id: def.id,
-      title: built.title || def.title,
-      text: text,
+      title: partyText(game, built.title || def.title),
+      text: partyText(game, text),
       tags: built.tags || def.tags || [],
-      choices: built.choices || def.choices,
+      choices: partyFill(game, built.choices || def.choices),
       timed: built.timed || def.timed || 0,
       timeout: built.timeout || def.timeout || null,
       milestone: !!built.milestone || !!def.milestone,
@@ -1156,6 +1190,10 @@
     quoteFor: quoteFor,
     goals: goals,
     nextMilestone: nextMilestone,
+    partyText: partyText,
+    partyFill: partyFill,
+    packRun: packRun,
+    unpackRun: unpackRun,
     riskChance: riskChance,
     shapeDelta: shapeDelta,
     dailyBurn: dailyBurn,

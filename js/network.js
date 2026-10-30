@@ -127,28 +127,28 @@
     },
     {
       id: "skeptic", mile: 900, kind: "meeting", partnerId: "casey",
-      title: "Casey is not impressed",
+      title: "{p1} is not impressed",
       place: "Their office, fluorescent and honest",
-      brief: "Casey Lin might be the first real customer. They have been burned by demos. Listen for the scar, then build the third offer.",
+      brief: "{p1} sat in on the call. The customer has been burned by demos. Listen for the scar, then build the third offer.",
       rounds: [
         { line: "I have seen this movie. The demo works. Tuesday does not.", options: [
-          { id: "listen", label: "Ask about Tuesday", detail: "The real day, not the pitch day.", break: 28, trust: 8, note: "Casey tells you where the last tool died." },
-          { id: "push", label: "Our Tuesday is different", detail: "Promise the scar away.", break: 4, trust: -6, note: "They have a bingo card for this." },
+          { id: "listen", label: "Ask about Tuesday", detail: "The real day, not the pitch day.", break: 28, trust: 8, note: "{p1} writes down where the last tool died." },
+          { id: "push", label: "Our Tuesday is different", detail: "Promise the scar away.", break: 4, trust: -6, note: "{p1} has a bingo card for this." },
           { id: "third", label: "Sit inside their Tuesday", detail: "You will watch one real shift.", break: 32, trust: 10, effects: { morale: -2 }, note: "Uncomfortable. Correct." }
         ]},
         { line: "My team will not adopt a toy. Who is on the hook when it breaks?", options: [
           { id: "listen", label: "Name the fear", detail: "They do not want to be heroes.", break: 12, trust: 4, note: "You heard it." },
-          { id: "push", label: "Your team is the problem", detail: "Adoption is a choice.", break: 8, trust: -8, note: "Casey goes cold." },
+          { id: "push", label: "Your team is the problem", detail: "Adoption is a choice.", break: 8, trust: -8, note: "{p1} goes quiet. The customer does too." },
           { id: "third", label: "We eat the first month", detail: "If it breaks, it is our pager.", break: 30, trust: 10, effects: { runway: -4 }, note: "Skin. They notice." }
         ]},
         { line: "So why should I bet my reputation on a wagon?", options: [
           { id: "listen", label: "Ask what a small bet is", detail: "Let them design the pilot.", break: 16, trust: 6, note: "They pick ten people, not the company." },
-          { id: "push", label: "Because we are hungry", detail: "Hunger is not a SLA.", break: 2, trust: -6, note: "Casey almost smiles. Not kindly." },
+          { id: "push", label: "Because we are hungry", detail: "Hunger is not a SLA.", break: 2, trust: -6, note: "{p1} almost smiles. Not kindly." },
           { id: "third", label: "A pilot with a kill date", detail: "Thirty days, then they can walk.", break: 36, trust: 12, effects: { traction: 8 }, note: "A door with a handle on their side." }
         ]}
       ],
-      success: { effects: { traction: 14 }, trust: 8, text: "Casey will try ten seats. Not love. A trial with a calendar. That is how design partners start." },
-      fail: { effects: { traction: -2 }, trust: -8, teach: "You learned Casey buys relief, not vision. Next time, own the pager.", text: "No pilot. Casey keeps your deck to show the team what not to buy." }
+      success: { effects: { traction: 14 }, trust: 8, text: "{p1} gets the customer to try ten seats. Not love. A trial with a calendar. That is how design partners start." },
+      fail: { effects: { traction: -2 }, trust: -8, teach: "You learned this customer buys relief, not vision. Next time, own the pager. {p1} already knew.", text: "No pilot. {p1} keeps the deck to show the team what not to buy." }
     },
     {
       id: "board-push", mile: 1680, kind: "meeting", partnerId: "helena",
@@ -169,7 +169,7 @@
         { line: "Give me a reason to defend you when I hang up.", options: [
           { id: "listen", label: "Ask what she needs to hear", detail: "Then say only that.", break: 18, trust: 8, note: "She wants a customer sentence." },
           { id: "push", label: "Defend yourself", detail: "List the work.", break: 6, trust: -4, note: "A speech. She wanted a shield." },
-          { id: "third", label: "Hand her a sentence", detail: "Casey is in ten seats. That is the shield.", break: 36, trust: 12, effects: { morale: 4 }, note: "Specific. She can repeat it." }
+          { id: "third", label: "Hand her a sentence", detail: "{p1} has the pilot in ten seats. That is the shield.", break: 36, trust: 12, effects: { morale: 4 }, note: "Specific. She can repeat it." }
         ]}
       ],
       success: { effects: { morale: 8, equity: 2 }, trust: 8, text: "Helena will defend you on the next call. Not forever. For this month, which is a lifetime on a board." },
@@ -206,7 +206,7 @@
       brief: "Late, honest, a little greasy. Samir Adeyemi pretends he came for the hash browns. He came to see if you are real.",
       line: "Samir flips the napkin. 'Draw the customer. Not the market. The person.'",
       options: [
-        { label: "Draw Casey", detail: "A real scar, a real Tuesday.", partnerId: "samir", trust: 16, effects: { traction: 6, unicorn: 4 }, text: "Samir adds a number in the corner. Not a term sheet. A path.", june: "You drew a human. He put the pen down. That is respect." },
+        { label: "Draw {p1}'s Tuesday", detail: "A real scar, a real person on your wagon.", partnerId: "samir", trust: 16, effects: { traction: 6, unicorn: 4 }, text: "Samir adds a number in the corner. Not a term sheet. A path.", june: "You drew a human. He put the pen down. That is respect." },
         { label: "Draw the huge market", detail: "The slide he did not ask for.", partnerId: "samir", trust: -6, effects: { morale: -2 }, text: "He nods the way people nod at weather. No wire.", june: "You brought a canyon to a booth. He wanted a person." },
         { label: "Ask him what he regrets", detail: "Mentors love a true question.", partnerId: "samir", trust: 12, effects: { morale: 4, runway: 4 }, text: "He tells a short story about selling early. June goes quiet, which is loud.", june: "He and I have the same scar. You asked instead of performing. Good." }
       ]
@@ -220,7 +220,7 @@
       options: [
         { label: "Tell her one true miss", detail: "Vulnerable. On purpose.", partnerId: "nia", trust: 18, effects: { unicorn: 8, morale: 2 }, text: "Nia shares one of hers. A truce, not a merger.", june: "You skipped the costume. She noticed. I noticed." },
         { label: "Recruit the room", detail: "Hungry. A little much.", effects: { traction: 4, morale: -4 }, partnerId: "jordan", trust: 4, text: "You collect three maybes and a headache.", june: "The afterparty is not a funnel. You used it like one." },
-        { label: "Introduce Casey to Ida", detail: "Make the network do the work.", partnerId: "casey", trust: 10, effects: { traction: 8 }, text: "Two people you earned put their heads together. You are not the center. Good.", june: "Look at you, being a connector. I might retire." }
+        { label: "Introduce {p1} to Ida", detail: "Make the network do the work.", partnerId: "casey", trust: 10, effects: { traction: 8 }, text: "Two people you earned put their heads together. You are not the center. Good.", june: "Look at you, being a connector. I might retire." }
       ]
     }
   ];
@@ -236,9 +236,18 @@
     return null;
   }
 
-  function begin(enc) {
+  function fillValue(game, value) {
+    var ht = root.HT;
+    if (ht && ht.partyFill) return ht.partyFill(game || { cofounders: [] }, value);
+    return value;
+  }
+
+  function begin(a, b) {
+    var game = b ? a : null;
+    var enc = b || a;
+    var def = fillValue(game, enc);
     return {
-      def: enc,
+      def: def,
       round: 0,
       breakthrough: enc.kind === "meeting" ? 24 : 0,
       done: false,
