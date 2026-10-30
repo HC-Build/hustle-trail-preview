@@ -28,7 +28,11 @@
   function readBest() {
     try {
       var raw = localStorage.getItem(BEST_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+      if (typeof data.score !== "number" || !isFinite(data.score)) return null;
+      return data;
     } catch (e) {
       return null;
     }

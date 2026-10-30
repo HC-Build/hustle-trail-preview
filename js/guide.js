@@ -9,8 +9,10 @@
   var NAME = "June Harlow";
   var ROLE = "Trail boss";
 
-  // Optional later. Leave null. No keys live in this repo.
-  var modelEndpoint = null;
+  // Set this to the deployed proxy (see /proxy). Empty keeps scripted June.
+// Never put an API key here.
+var PROXY_URL = "";
+  var modelEndpoint = PROXY_URL;
 
   var RUMORS = {
     payroll: {
@@ -432,6 +434,7 @@
   var userActivated = false;
   var queue = [];
   var speaking = false;
+  var micHold = false;
   var utterKeep = [];
   var chosen = { june: null, male: null, female: null };
   var recOn = false;
@@ -518,7 +521,7 @@
   }
 
   function pump() {
-    if (speaking || !voiceOn || !userActivated || !window.speechSynthesis) return;
+    if (micHold || speaking || !voiceOn || !userActivated || !window.speechSynthesis) return;
     if (!queue.length) { paintTalking(false); return; }
     var item = queue.shift();
     var profile = profileFor(item.who);
@@ -932,75 +935,135 @@
     var btn = document.getElementById("guide-mic");
     var status = document.getElementById("guide-micstatus");
     var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var session = 0;
+    var active = null;
+    var stopping = false;
+
+    function setMic(state, message) {
+      recOn = state === "listening";
+      btn.dataset.state = state;
+      btn.classList.toggle("live", state === "listening");
+      btn.classList.toggle("err", state === "error");
+      btn.setAttribute("aria-pressed", state === "listening" ? "true" : "false");
+      var label = state === "listening" ? "Listening" : state === "error" ? "Mic error" : "Mic";
+      btn.textContent = label;
+      if (status) {
+        status.dataset.state = state;
+        status.textContent = message || (state === "listening" ? "Listening" : state === "error" ? "Mic error. Type instead." : "Mic idle");
+      }
+    }
+
+    function releaseMic() {
+      micHold = false;
+      stopping = false;
+      active = null;
+      pump();
+    }
+
+    function hushJune() {
+      micHold = true;
+      queue = [];
+      speaking = false;
+      paintTalking(false);
+      try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+    }
+
     if (!Rec) {
+      setMic("error", "Mic is not in this browser. Type it.");
       btn.addEventListener("click", function () {
         var input = document.getElementById("guide-input");
         if (input) input.focus();
-        status.textContent = "Mic is not in this browser. Type it.";
+        setMic("error", "Mic is not in this browser. Type it.");
       });
       return;
     }
-    var rec = null;
-    btn.addEventListener("click", function () {
-      primeFromGesture();
-      if (recOn && rec) {
-        try { rec.stop(); } catch (e) {}
+
+    setMic("idle", "Mic idle");
+
+    function begin() {
+      var rec;
+      try { rec = new Rec(); } catch (e) {
+        setMic("error", "Mic would not start. Type it.");
         return;
       }
-      try {
-        rec = new Rec();
-      } catch (e) {
-        status.textContent = "Mic would not start. Type it.";
-        document.getElementById("guide-input").focus();
-        return;
-      }
+      var mine = ++session;
+      var finalText = "";
+      var sent = false;
+      var hardError = false;
+      stopping = false;
+      active = rec;
+      hushJune();
       rec.lang = "en-US";
       rec.interimResults = true;
       rec.continuous = false;
       rec.maxAlternatives = 1;
-      recOn = true;
-      btn.classList.add("live");
-      status.textContent = "Listening...";
-      var finalText = "";
       rec.onresult = function (event) {
+        if (mine !== session) return;
         var text = "";
         for (var i = event.resultIndex; i < event.results.length; i++) {
           text += event.results[i][0].transcript;
-          if (event.results[i].isFinal) finalText = text;
+          if (event.results[i].isFinal) finalText = (finalText + " " + event.results[i][0].transcript).trim();
         }
         var input = document.getElementById("guide-input");
-        if (input) input.value = text;
+        if (input) input.value = finalText || text;
       };
       rec.onerror = function (event) {
-        recOn = false;
-        btn.classList.remove("live");
+        if (mine !== session) return;
         var code = event && event.error;
+        if (code === "aborted" || code === "no-speech") return;
         if (code === "not-allowed" || code === "service-not-allowed") {
-          status.textContent = "Mic is blocked. Type it.";
-        } else if (code === "no-speech") {
-          status.textContent = "I did not hear you. Type it if you want.";
+          hardError = true;
+          setMic("error", "Mic is blocked. Type instead.");
         } else {
-          status.textContent = "Voice input stumbled. Type it.";
+          hardError = true;
+          setMic("error", "Mic error. Type instead.");
         }
-        var input = document.getElementById("guide-input");
-        if (input) input.focus();
       };
       rec.onend = function () {
-        recOn = false;
-        btn.classList.remove("live");
-        if (status.textContent === "Listening...") status.textContent = "";
+        if (mine !== session) return;
+        active = null;
+        if (hardError) { releaseMic(); return; }
+        var heard = (finalText || "").trim();
         var input = document.getElementById("guide-input");
-        var heard = (finalText || (input && input.value) || "").trim();
-        if (heard) {
-          if (input) input.value = "";
-          sendText(heard);
+        if (!heard && input) heard = (input.value || "").trim();
+        releaseMic();
+        if (stopping && !heard) {
+          setMic("idle", "Mic idle");
+          return;
         }
+        if (!heard) {
+          setMic("idle", "Didn't catch that. Tap mic or type.");
+          return;
+        }
+        if (sent) return;
+        sent = true;
+        if (input) input.value = "";
+        setMic("idle", "Heard you.");
+        sendText(heard);
       };
-      try { rec.start(); } catch (e2) {
-        recOn = false;
-        btn.classList.remove("live");
-        status.textContent = "Mic would not start. Type it.";
+      try {
+        rec.start();
+        setMic("listening", "Listening");
+      } catch (err) {
+        try { rec.abort(); } catch (e2) {}
+        active = null;
+        releaseMic();
+        setMic("error", "Mic was busy. Tap again.");
       }
+    }
+
+    btn.addEventListener("click", function () {
+      primeFromGesture();
+      if (recOn && active) {
+        stopping = true;
+        session += 1;
+        try { active.abort(); } catch (e) { try { active.stop(); } catch (e2) {} }
+        active = null;
+        releaseMic();
+        setMic("idle", "Mic idle");
+        return;
+      }
+      begin();
     });
   }
 
