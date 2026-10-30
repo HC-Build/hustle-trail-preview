@@ -1210,7 +1210,273 @@
     }
   };
 
-  var MILESTONES = [
+  // Matt: replace every PLACEHOLDER_URL with a real clip. Do not leave invented links.
+// Fields: title, url, category, lesson, reward.
+var WATCH_CLIPS = [
+  {
+    title: "PLACEHOLDER: Silicon Valley short",
+    url: "PLACEHOLDER_URL",
+    category: "Silicon Valley",
+    lesson: "PLACEHOLDER: one line on why this short is worth the minute.",
+    reward: { traction: 6 }
+  },
+  {
+    title: "PLACEHOLDER: founder clip",
+    url: "PLACEHOLDER_URL",
+    category: "Founders",
+    lesson: "PLACEHOLDER: one line on the founder move worth copying.",
+    reward: { unicorn: 8 }
+  },
+  {
+    title: "PLACEHOLDER: epic history moment",
+    url: "PLACEHOLDER_URL",
+    category: "History",
+    lesson: "PLACEHOLDER: one line on what this moment teaches a person who ships.",
+    reward: { runway: 6 }
+  },
+  {
+    title: "PLACEHOLDER: philosophy clip",
+    url: "PLACEHOLDER_URL",
+    category: "Philosophy",
+    lesson: "PLACEHOLDER: one line on the idea that should bother a founder.",
+    reward: { unicorn: 10 }
+  },
+  {
+    title: "PLACEHOLDER: tech clip",
+    url: "PLACEHOLDER_URL",
+    category: "Tech",
+    lesson: "PLACEHOLDER: one line on the technical lesson hiding in the demo.",
+    reward: { traction: 8 }
+  }
+];
+
+// Comment costumes for Watch and Engage. Matt can add more. Keep them kind.
+var COMMENT_STYLES = [
+  {
+    id: "boomer",
+    featured: true,
+    label: "Most boomer comment possible",
+    announce: "Dare: the most boomer comment you can write without being cruel. Caps and dot dot dot are welcome. Stay kind and on the clip.",
+    keywords: ["back in my day", "youngsters", "kids these days", "forwarded", "as per my last email"],
+    caps: true,
+    ellipsis: true,
+    nailAt: 2,
+    bonus: { traction: 3 }
+  },
+  {
+    id: "corporate",
+    featured: true,
+    label: "Max corporate-speak",
+    announce: "Dare: maximum corporate-speak. Synergy, circle back, move the needle. Kind, and still about the clip.",
+    keywords: ["synergy", "circle back", "move the needle", "leverage", "bandwidth", "alignment", "deep dive"],
+    nailAt: 2,
+    bonus: { traction: 3 }
+  },
+  {
+    id: "dotcom99",
+    label: "1999 dot-com founder",
+    announce: "Dare: comment like a 1999 founder. Eyeballs, a portal, a land grab. Be silly, not mean.",
+    keywords: ["eyeballs", "land grab", "portal", "stickiness", "first mover", "b2b", "ipo"],
+    nailAt: 2,
+    bonus: { unicorn: 3 }
+  },
+  {
+    id: "philosopher",
+    label: "Philosopher",
+    announce: "Dare: comment like a philosopher. Therefore, virtue, the examined bit. On the clip, and kind.",
+    keywords: ["therefore", "examined", "virtue", "absurd", "ought", "meaning"],
+    nailAt: 2,
+    bonus: { unicorn: 4 }
+  },
+  {
+    id: "hype-vc",
+    featured: true,
+    label: "Hype VC",
+    announce: "Dare: hype VC. Generational, category defining, let's go. Hype the idea, not a person.",
+    keywords: ["generational", "100x", "crush it", "category defining", "let's go", "rocket ship"],
+    nailAt: 2,
+    bonus: { unicorn: 4 }
+  },
+  {
+    id: "patagonia-vc",
+    featured: true,
+    label: "Patagonia vest VC",
+    announce: "Dare: Patagonia vest VC. I want TAM, founder-market fit, huge if true, a cortado, an offsite, circle back, and not investment advice. Be kind. Stay on the clip.",
+    keywords: ["tam", "founder-market fit", "huge if true", "circle back", "cortado", "offsite", "not investment advice"],
+    nailAt: 2,
+    bonus: { unicorn: 5 }
+  },
+  {
+    id: "supportive",
+    label: "Proud relative",
+    announce: "Dare: comment like someone who is proud of the speaker. Warm, specific, not creepy.",
+    keywords: ["proud of you", "so talented", "rooting for you", "you got this", "love this"],
+    nailAt: 1,
+    bonus: { runway: 2 }
+  },
+  {
+    id: "tired-engineer",
+    label: "Tired engineer",
+    announce: "Dare: tired engineer. Logs, edge cases, it depends. Helpful, not hostile.",
+    keywords: ["edge case", "logs", "it depends", "rollback", "undefined", "actually"],
+    nailAt: 2,
+    bonus: { traction: 3 }
+  },
+  {
+    id: "poet",
+    label: "Poet",
+    announce: "Dare: a small poem of a comment. Moon, river, hush. About the clip.",
+    keywords: ["moon", "silence", "river", "lantern", "hush"],
+    nailAt: 2,
+    bonus: { unicorn: 3 }
+  },
+  {
+    id: "coach",
+    label: "Sports coach",
+    announce: "Dare: locker-room coach. Reps, execute, one play. Encourage, do not insult.",
+    keywords: ["reps", "execute", "championship", "one play", "locker"],
+    nailAt: 2,
+    bonus: { traction: 3 }
+  },
+  {
+    id: "pirate",
+    label: "Friendly pirate",
+    announce: "Dare: a friendly pirate. Arr, treasure, matey. Menace is banned.",
+    keywords: ["arr", "treasure", "matey", "plunder", "ahoy"],
+    nailAt: 2,
+    bonus: { runway: 3 }
+  },
+  {
+    id: "lawyer",
+    label: "Careful lawyer",
+    announce: "Dare: careful counsel. Hereby, pursuant, notwithstanding. Still human.",
+    keywords: ["hereby", "pursuant", "notwithstanding", "without prejudice", "counsel"],
+    nailAt: 2,
+    bonus: { traction: 4 }
+  },
+  {
+    id: "gen-z",
+    label: "Group chat",
+    announce: "Dare: group-chat voice. Lowkey, it's giving, ate that. Keep it kind.",
+    keywords: ["slay", "lowkey", "it's giving", "rent free", "ate that", "no because"],
+    nailAt: 2,
+    bonus: { unicorn: 3 }
+  },
+  {
+    id: "scientist",
+    label: "Scientist",
+    announce: "Dare: scientist. Hypothesis, evidence, replicate. Curious, not smug.",
+    keywords: ["hypothesis", "control group", "evidence", "replicate", "sample size"],
+    nailAt: 2,
+    bonus: { traction: 4 }
+  },
+  {
+    id: "chef",
+    label: "Chef",
+    announce: "Dare: a chef's comment. Reduce, simmer, season. Taste the idea, do not burn the cook.",
+    keywords: ["reduce", "simmer", "season", "plate", "taste"],
+    nailAt: 2,
+    bonus: { runway: 2 }
+  },
+  {
+    id: "western",
+    label: "Trail western",
+    announce: "Dare: western. Dust, partner, sunset. On topic. No threats.",
+    keywords: ["partner", "dust", "saloon", "horseback", "sunset"],
+    nailAt: 2,
+    bonus: { runway: 3 }
+  },
+  {
+    id: "haiku",
+    label: "Haiku fan",
+    announce: "Dare: three short lines, or say haiku and mean it. About the clip.",
+    keywords: ["haiku", "syllable", "three lines"],
+    lines: 3,
+    nailAt: 1,
+    bonus: { unicorn: 3 }
+  }
+];
+
+// Matt: edit this list. Starters are the player's own posts, never a follow reward.
+// gameUrl: replace PASTE_GAME_URL_HERE with the public game link when you have one.
+var SIDE_QUESTS = {
+  cooldownMs: 8 * 60 * 1000,
+  streakWindowMs: 36 * 60 * 60 * 1000,
+  gameUrl: "PASTE_GAME_URL_HERE",
+  clips: WATCH_CLIPS,
+  entries: [
+    {
+      id: "build-public",
+      kind: "post",
+      pace: "quick",
+      title: "Build in public",
+      blurb: "Post an honest update. What you shipped, what stalled, what is true today.",
+      dare: "Founders skip this because it is slow and not a launch. Post the boring truth.",
+      draft: "Build in public. {company} is at mile {mile}. Today is true: {pitch}. Score {score}. #HustleTrail",
+      channels: ["x", "linkedin"],
+      rewards: { runway: 8 },
+      hype: "You put the wagon in public. That is runway for a quick, slightly naked post. Do it again before the streak dies."
+    },
+    {
+      id: "thoughtful-comment",
+      kind: "comment",
+      pace: "steady",
+      title: "Leave a thoughtful comment",
+      blurb: "On a founder or investor post, or under a talk, write a real comment. Your words. Not a heart, not a follow.",
+      dare: "Pick any post you already respect. Add something useful. Come back when it is up.",
+      minLength: 24,
+      rewards: { traction: 8 },
+      hype: "A real comment, not a heart icon. Traction for the slow work. I am almost impressed."
+    },
+    {
+      id: "sixty-seconds",
+      kind: "video",
+      pace: "vulnerable",
+      title: "Record 60 seconds",
+      blurb: "One minute on the startup, in your voice. Keep it or post it. The point is you sat in front of the camera.",
+      dare: "Most people will rewrite the script forever. Hit record. Sixty seconds. Then tell me it exists.",
+      rewards: { unicorn: 12 },
+      hype: "You faced a lens. That is Unicorn Glow, the expensive kind. I am hyping you and I mean it."
+    },
+    {
+      id: "dm-three",
+      kind: "dm",
+      pace: "steady",
+      title: "DM 3 potential customers",
+      blurb: "Three real people who might pay. No pitch deck. Ask if the problem is real.",
+      dare: "This is the boring scary one. Send three. I am not collecting their names.",
+      steps: 3,
+      rewards: { traction: 10 },
+      hype: "Three DMs. That is the grind with dirt under it. Traction, and a streak tick if you keep showing up."
+    },
+    {
+      id: "ask-feedback",
+      kind: "post",
+      pace: "vulnerable",
+      title: "Ask for feedback in public",
+      blurb: "Post a specific question about the product. Invite the correction.",
+      dare: "Ask like you can stand the answer. Vague pleas do not count.",
+      draft: "Honest question about {company}: what is confusing, missing, or easy to ignore? Mile {mile}. {pitch} #HustleTrail",
+      channels: ["x", "linkedin"],
+      rewards: { unicorn: 8 },
+      hype: "You asked to be corrected in public. Glow for the bruise. Read the replies before you get defensive."
+    },
+    {
+      id: "failure-story",
+      kind: "post",
+      pace: "vulnerable",
+      title: "Share a failure story",
+      blurb: "One true miss. What broke, what you learned, no costume of success.",
+      dare: "The vulnerable one. If it still stings, it is the right story.",
+      draft: "A failure from {company}: we are at mile {mile} and this part hurt. What I would do differently is still ugly. #HustleTrail",
+      channels: ["x", "linkedin"],
+      rewards: { unicorn: 14 },
+      hype: "You told the miss out loud. That is the biggest glow I give. I sold my company too early, so I know the price of the pretty version."
+    }
+  ]
+};
+
+var MILESTONES = [
     { id: "garage", mile: 0, name: "The Garage", goal: "Roll out of the driveway" },
     { id: "users", mile: 400, name: "First Users", goal: "Get ten humans who are not your parents" },
     { id: "pmf", mile: 800, name: "Product-Market Fit", goal: "Find one stranger who comes back" },
@@ -1228,6 +1494,9 @@
     EVENTS: EVENTS,
     ENDINGS: ENDINGS,
     MILESTONES: MILESTONES,
+    SIDE_QUESTS: SIDE_QUESTS,
+    WATCH_CLIPS: WATCH_CLIPS,
+    COMMENT_STYLES: COMMENT_STYLES,
     buildMilestone: buildMilestone,
     pick: pick,
     shuffle: shuffle

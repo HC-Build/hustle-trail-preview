@@ -93,7 +93,7 @@ h1, h2, h3, .wordmark, .stamp {
 }
 
 .ghost:hover, .icon-btn:hover, .texty:hover { background: rgba(244, 234, 215, 0.08); }
-.hero .ghost, .sheet-card .ghost, .recap-card .ghost, .recap-card .texty, .sheet-card .texty {
+.hero .ghost, .sheet-card .ghost, .card .ghost, .recap-card .ghost, .recap-card .texty, .sheet-card .texty {
   color: var(--ink);
   border-color: rgba(36, 23, 15, 0.35);
   background: #fffaf1;
@@ -604,5 +604,124 @@ body.shake { animation: shake 0.4s linear; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wagon.moving, body.shake { animation: none; }
+  .wagon.moving, body.shake, .g-avatar.talking { animation: none; }
+}
+
+#guide {
+  position: fixed;
+  z-index: 18;
+  left: 12px;
+  bottom: 12px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(46vh, 440px);
+  display: flex;
+  flex-direction: column;
+  background: #f4ead7;
+  color: #24170f;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+#guide.min {
+  width: 72px;
+  height: 72px;
+  max-height: 72px;
+  border-radius: 50%;
+  padding: 0;
+}
+#guide.min .g-id, #guide.min .g-log, #guide.min .g-quick, #guide.min .g-form,
+#guide.min .g-rumor, #guide.min .g-min, #guide.min .g-voice, #guide.min .g-micstatus,
+#guide.min .g-tap { display: none; }
+#guide.min .g-head { padding: 0; background: transparent; }
+#guide.min .g-avatar { width: 72px; height: 72px; }
+.g-head { display: flex; gap: 8px; align-items: center; padding: 8px; background: #2a1c16; color: #f4ead7; }
+.g-avatar {
+  width: 48px; height: 48px; border-radius: 50%; padding: 0; background: #f4ead7; flex: none;
+}
+.g-avatar svg { width: 100%; height: 100%; display: block; }
+.g-avatar.talking { box-shadow: 0 0 0 3px #e2a01b; }
+.g-id { flex: 1; min-width: 0; }
+.g-id strong { display: block; font-family: Palatino, Georgia, serif; }
+.g-id span { display: block; font-size: 0.75rem; color: #e7d6b6; }
+.g-voice, .g-min {
+  background: transparent; color: #f4ead7; border: 1px solid rgba(244, 234, 215, 0.4);
+  border-radius: 999px; padding: 6px 8px; min-height: 36px; font-size: 0.78rem;
+}
+.g-log { overflow: auto; padding: 8px 10px; flex: 1; min-height: 72px; }
+.g-line { margin: 0 0 8px; font-size: 0.92rem; }
+.g-line.june { color: #6d3014; }
+.g-line.you { color: #1d6b45; }
+.g-line.npc { color: #243044; }
+.g-quick, .g-rumor { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px; }
+.g-quick button, .g-rumor button, .g-form button, .scene-replies button.alt {
+  background: #fffaf1; color: #24170f; border: 1px solid rgba(36, 23, 15, 0.18);
+  border-radius: 999px; padding: 6px 10px; min-height: 36px; font-size: 0.82rem;
+}
+.g-form { display: flex; gap: 6px; padding: 0 8px 8px; }
+.g-form input {
+  flex: 1; min-width: 0; border-radius: 12px; border: 1px solid rgba(36, 23, 15, 0.2);
+  padding: 8px 10px; font-size: 16px; background: #fffaf1; color: #24170f;
+}
+#guide-mic.live { background: #9d2218; color: white; }
+.g-micstatus { margin: 0; padding: 0 10px 8px; font-size: 0.75rem; color: #5c4636; min-height: 0; }
+.g-tap {
+  margin: 6px 8px 0; background: #c4491d; color: white; border-radius: 999px; min-height: 36px;
+}
+body.guide-open .trail { padding-bottom: 220px; }
+body.overlay-open #guide.auto-min {
+  top: 10px; bottom: auto; left: 10px; width: 64px; height: 64px; max-height: 64px;
+  border-radius: 50%; overflow: hidden;
+}
+body.overlay-open #guide.auto-min .g-id,
+body.overlay-open #guide.auto-min .g-voice,
+body.overlay-open #guide.auto-min .g-min,
+body.overlay-open #guide.auto-min .g-log,
+body.overlay-open #guide.auto-min .g-quick,
+body.overlay-open #guide.auto-min .g-form,
+body.overlay-open #guide.auto-min .g-rumor,
+body.overlay-open #guide.auto-min .g-micstatus,
+body.overlay-open #guide.auto-min .g-tap { display: none; }
+body.overlay-open #guide.auto-min .g-head { display: flex; padding: 0; background: transparent; }
+body.overlay-open #guide:not(.auto-min) {
+  top: 8px; bottom: auto; max-height: 32vh; z-index: 25;
+}
+.june-aside {
+  display: flex; gap: 8px; align-items: flex-start; background: #fff6e8;
+  border-radius: 12px; padding: 8px; margin: 8px 0;
+}
+.june-aside svg { width: 36px; height: 36px; flex: none; }
+.june-aside p { margin: 0; font-size: 0.92rem; }
+.stage { border-radius: 16px; overflow: hidden; margin: 8px 0; min-height: 168px; position: relative; }
+.stage.coffee { background: linear-gradient(#e7b089, #8a4b32 70%); }
+.stage.zoom { background: #1b2430; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; }
+.stage.meetup { background: linear-gradient(#3c2a4a, #c4491d); }
+.stage.hall { background: linear-gradient(#2a2148, #141026); color: #f4ead7; }
+.stage.board { background: linear-gradient(#4a3428, #1c140f); }
+.stage .banner { position: absolute; left: 12px; top: 12px; background: #f4ead7; color: #24170f; border-radius: 8px; padding: 4px 8px; font-weight: 800; }
+.tile { background: #2c3848; border-radius: 12px; min-height: 72px; color: white; position: relative; }
+.tile.live { box-shadow: inset 0 0 0 3px #3dcc7a; }
+.tile span { position: absolute; left: 8px; bottom: 6px; font-size: 0.75rem; }
+.face {
+  width: 42px; height: 42px; border-radius: 50%; background: #f4ead7; color: #24170f;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; margin: 12px;
+}
+.cups { position: absolute; right: 16px; bottom: 16px; display: flex; gap: 8px; }
+.cup { width: 28px; height: 22px; background: #f4ead7; border-radius: 0 0 10px 10px; border: 3px solid #24170f; }
+.npc-line { font-size: 1.05rem; margin: 6px 0; }
+.scene-replies { display: grid; gap: 8px; }
+.quest { margin: 14px 0; padding-top: 8px; border-top: 1px solid rgba(36, 23, 15, 0.12); }
+.quest h3 { margin: 0 0 4px; }
+.quest .primary, .quest .choice { margin-top: 8px; width: 100%; }
+
+@media (max-width: 860px) {
+  #guide {
+    left: 8px; right: 8px; width: auto;
+    bottom: calc(176px + env(safe-area-inset-bottom));
+    max-height: 34vh;
+  }
+  #guide.min, body.overlay-open #guide.auto-min {
+    right: auto; width: 64px; bottom: auto;
+  }
+  body.guide-open .trail { padding-bottom: 0; }
+  body.overlay-open #guide:not(.auto-min) { max-height: 28vh; }
 }

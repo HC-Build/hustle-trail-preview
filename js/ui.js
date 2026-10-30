@@ -165,6 +165,7 @@
       wrap.appendChild(help);
     }
     app.appendChild(wrap);
+    if (window.HT_GUIDE) HT_GUIDE.onScreen("title");
   }
 
   function renderSetup() {
@@ -253,6 +254,7 @@
     app.appendChild(wrap);
     fillParty();
     name.focus();
+    if (window.HT_GUIDE) HT_GUIDE.onScreen("setup");
   }
 
   function fillParty() {
@@ -304,6 +306,7 @@
     renderTrail();
     startLoop();
     toneClick();
+    if (window.HT_GUIDE) HT_GUIDE.onRun(state.run);
   }
 
   function startLoop() {
@@ -323,6 +326,7 @@
 
   function afterChange() {
     if (!state.run) return;
+    if (window.HT_GUIDE && state.run.phase !== "ended") HT_GUIDE.onChange(state.run);
     if (state.run.phase === "ended") {
       enterRecap();
       return;
@@ -418,7 +422,7 @@
     root.appendChild(scene);
 
     var sheet = el("section", "sheet");
-    ["runway", "equity", "morale", "traction"].forEach(function (key) {
+    ["runway", "equity", "morale", "traction", "unicorn"].forEach(function (key) {
       var row = el("div", "meter");
       row.id = "meter-" + key;
       var head = el("div", "meter-head");
@@ -465,6 +469,8 @@
     actions.appendChild(pause);
     var fast = actionButton("fast", "Fast travel", function () { toggleSpeed(); });
     actions.appendChild(fast);
+    var questsBtn = actionButton("quests", "Side quests", function () { openQuests(); });
+    actions.appendChild(questsBtn);
     root.appendChild(actions);
 
     var log = el("section", "log span-2");
@@ -489,7 +495,7 @@
   }
 
   function labelFor(key) {
-    return { runway: "Runway", equity: "Equity", morale: "Morale", traction: "Traction" }[key];
+    return { runway: "Runway", equity: "Equity", morale: "Morale", traction: "Traction", unicorn: "Unicorn Glow" }[key];
   }
 
   function actionButton(id, text, fn) {
@@ -511,6 +517,7 @@
     paintStat("equity", run.equity, 100);
     paintStat("morale", run.morale, 100);
     paintStat("traction", run.traction, 100);
+    paintStat("unicorn", run.unicorn || 0, 100);
     var seg = HT.segmentInfo(run.miles);
     var scene = document.getElementById("scene");
     scene.dataset.segment = seg.id;
@@ -586,7 +593,7 @@
       var li = el("li", line.tone || "", "Day " + line.day + ". " + line.text);
       log.appendChild(li);
     });
-    ["rest", "email", "hunt", "pause", "fast"].forEach(function (id) {
+    ["rest", "email", "hunt", "pause", "fast", "quests"].forEach(function (id) {
       var btn = document.getElementById("btn-" + id);
       if (id === "email" || id === "hunt") return;
       if (btn) btn.disabled = run.phase !== "travel";
@@ -644,6 +651,269 @@
     afterChange();
   }
 
+  function loadQuestClock() {
+    try {
+      var raw = localStorage.getItem("hustle-trail-sidequests");
+      var data = raw ? JSON.parse(raw) : {};
+      data.at = data.at || {};
+      data.globalAt = data.globalAt || 0;
+      return data;
+    } catch (e) {
+      return { at: {}, globalAt: 0 };
+    }
+  }
+
+  function saveQuestClock(clock) {
+    try { localStorage.setItem("hustle-trail-sidequests", JSON.stringify(clock)); } catch (e) {}
+  }
+
+  function openQuests() {
+    if (!state.run || state.run.phase !== "travel") return;
+    state.run.paused = true;
+    state.questOpened = state.questOpened || {};
+    mountQuests();
+    paintTrail();
+  }
+
+  function closeQuests() {
+    var old = document.getElementById("overlay");
+    if (old) old.remove();
+    state.overlayKey = "";
+    document.body.classList.remove("overlay-open");
+    var guide = document.getElementById("guide");
+    if (guide) guide.classList.remove("auto-min");
+    if (state.run && state.run.phase === "travel") state.run.paused = false;
+    paintTrail();
+  }
+
+  function mountQuests() {
+    var run = state.run;
+    var old = document.getElementById("overlay");
+    if (old) old.remove();
+    document.body.classList.add("overlay-open");
+    var guide = document.getElementById("guide");
+    if (guide) guide.classList.add("auto-min");
+    var overlay = el("div");
+    overlay.id = "overlay";
+    var card = el("section", "card");
+    card.appendChild(el("p", "kicker", "Hustle side quests"));
+    card.appendChild(el("h2", null, "The work founders dodge"));
+    var clock = loadQuestClock();
+    var streak = el("p", "body");
+    streak.id = "quest-streak";
+    streak.textContent = "Do it in the real world, then claim it. Quick posts pay runway. Boring consistency pays traction. Vulnerable work pays Unicorn Glow. Streak: " + (clock.streak || 0) + ".";
+    card.appendChild(streak);
+    if (window.HT_GUIDE) card.appendChild(juneAside("This game is here to make you learn, and to push you into the public work you avoid. Showing up pays off. Watch the clip, like it, comment in the dare, then paste it here. Keep it kind and on topic."));
+    card.appendChild(el("h3", null, "Watch and Engage"));
+    HT.watchClips().forEach(function (clip, index) { card.appendChild(clipCard(run, clip, index)); });
+    card.appendChild(el("h3", null, "The other grind"));
+    var list = HT.DATA.SIDE_QUESTS.entries;
+    list.forEach(function (quest) { card.appendChild(questCard(run, quest)); });
+    var close = el("button", "ghost", "Back to the trail");
+    close.type = "button";
+    close.addEventListener("click", closeQuests);
+    card.appendChild(close);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+
+  function clipCard(run, clip, index) {
+    var box = el("article", "quest");
+    var style = window.HT_GUIDE ? HT_GUIDE.styleForClip(run, index) : null;
+    box.appendChild(el("p", "kicker", clip.category || "Clip"));
+    box.appendChild(el("h3", null, clip.title));
+    box.appendChild(el("p", null, clip.lesson || ""));
+    box.appendChild(el("p", "trait", rewardLabel(clip.reward)));
+    if (!HT.isRealUrl(clip.url)) box.appendChild(el("p", "hint", "PLACEHOLDER_URL. Matt: paste a real link in WATCH_CLIPS."));
+    if (style) {
+      var dareLine = el("p", null, (style.featured ? "Featured dare: " : "Dare: ") + style.label);
+      box.appendChild(dareLine);
+    }
+    box.appendChild(el("p", "hint", "Watch it, like it, leave a real comment in that style. Kind, and about the clip. Then paste it here."));
+    var status = el("p", "hint");
+    status.id = "qstatus-clip-" + index;
+    box.appendChild(status);
+    var open = el("button", "choice", HT.isRealUrl(clip.url) ? "Open the clip" : "Clip link not in yet");
+    open.type = "button";
+    open.disabled = !HT.isRealUrl(clip.url);
+    open.addEventListener("click", function () {
+      state.questOpened["clip-" + index] = true;
+      window.open(clip.url, "_blank", "noopener,noreferrer");
+      status.textContent = "Clip opened. Watch, like, comment, then paste it.";
+      if (window.HT_GUIDE && style) HT_GUIDE.say(style.announce, "june");
+    });
+    box.appendChild(open);
+    var note = el("input");
+    note.type = "text";
+    note.maxLength = 240;
+    note.placeholder = "Paste your comment or one takeaway";
+    note.addEventListener("input", function () {
+      if (!style || !window.HT_GUIDE) return;
+      var rated = HT_GUIDE.rateComment(style, note.value);
+      status.textContent = rated.reaction;
+    });
+    box.appendChild(note);
+    var claim = el("button", "primary", "I watched, liked, and commented");
+    claim.type = "button";
+    claim.addEventListener("click", function () { finishClip(index, clip, style, note.value); });
+    box.appendChild(claim);
+    return box;
+  }
+
+  function finishClip(index, clip, style, note) {
+    var rated = style && window.HT_GUIDE ? HT_GUIDE.rateComment(style, note) : null;
+    var status = document.getElementById("qstatus-clip-" + index);
+    function speak(line) {
+      if (status) status.textContent = line;
+      if (window.HT_GUIDE) HT_GUIDE.say(line, "june");
+    }
+    if (!HT.isRealUrl(clip.url)) {
+      var wait = window.HT_GUIDE ? HT_GUIDE.sideQuestLine("placeholder") : "Placeholder URL.";
+      speak((rated ? rated.reaction + " " : "") + wait);
+      return;
+    }
+    var clock = loadQuestClock();
+    var result = HT.claimWatchClip(state.run, index, {
+      opened: !!(state.questOpened && state.questOpened["clip-" + index]),
+      note: note,
+      bonus: rated && rated.nailed ? rated.bonus : null
+    }, Date.now(), clock);
+    if (!result.ok) {
+      var line = window.HT_GUIDE ? HT_GUIDE.sideQuestLine(result.reason, { title: clip.title }) : "Not yet.";
+      if (rated && result.reason !== "short") line = rated.reaction + " " + line;
+      speak(line);
+      return;
+    }
+    HT.markQuestClaim(state.run, result.id, Date.now(), clock);
+    saveQuestClock(clock);
+    HT.playBeat(state.run, result.beat);
+    var cheer = window.HT_GUIDE ? HT_GUIDE.sideQuestLine("watch-ok", null, result.streak) : "Paid.";
+    if (rated) cheer = rated.reaction + " " + cheer;
+    speak(cheer);
+    paintTrail();
+    var streakLine = document.getElementById("quest-streak");
+    if (streakLine) streakLine.textContent = "Streak: " + (clock.streak || 1);
+  }
+
+  function rewardLabel(rewards) {
+    if (!rewards) return "";
+    var bits = [];
+    if (rewards.runway) bits.push("+" + rewards.runway + " runway");
+    if (rewards.traction) bits.push("+" + rewards.traction + " traction");
+    if (rewards.unicorn) bits.push("+" + rewards.unicorn + " Unicorn Glow");
+    return bits.join(", ");
+  }
+
+  function dare(quest) {
+    if (window.HT_GUIDE) HT_GUIDE.say(HT_GUIDE.sideQuestLine("dare", quest), "june");
+  }
+
+  function openChannel(run, quest, channel) {
+    state.questOpened[quest.id] = true;
+    var text = HT.fillDraft(run, quest.draft || "");
+    var url = HT.channelUrl(channel, text);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    var status = document.getElementById("qstatus-" + quest.id);
+    if (status) status.textContent = channel === "linkedin" ? "LinkedIn starter opened. Post your words, then confirm." : "X draft opened. Post it, then confirm.";
+    dare(quest);
+  }
+
+  function questCard(run, quest) {
+    var box = el("article", "quest");
+    var pace = quest.pace === "vulnerable" ? "Vulnerable" : quest.pace === "steady" ? "Slow and boring" : "Quick";
+    box.appendChild(el("h3", null, quest.title));
+    box.appendChild(el("p", "trait", pace + " · " + rewardLabel(quest.rewards)));
+    box.appendChild(el("p", null, quest.blurb));
+    var status = el("p", "hint");
+    status.id = "qstatus-" + quest.id;
+    box.appendChild(status);
+    if (quest.kind === "post") {
+      (quest.channels || ["x"]).forEach(function (channel) {
+        var label = channel === "linkedin" ? "Start on LinkedIn" : "Start on X";
+        var btn = el("button", "choice", label);
+        btn.type = "button";
+        btn.addEventListener("click", function () { openChannel(run, quest, channel); });
+        box.appendChild(btn);
+      });
+      var did = el("button", "primary", "I posted it");
+      did.type = "button";
+      did.addEventListener("click", function () { finishQuest(quest, { started: true }); });
+      box.appendChild(did);
+    } else if (quest.kind === "comment") {
+      var note = el("input");
+      note.type = "text";
+      note.maxLength = 200;
+      note.placeholder = "The comment you will actually leave";
+      box.appendChild(note);
+      var left = el("button", "primary", "I posted that comment");
+      left.type = "button";
+      left.addEventListener("click", function () {
+        dare(quest);
+        finishQuest(quest, { done: true, note: note.value });
+      });
+      box.appendChild(left);
+    } else if (quest.kind === "dm") {
+      var count = 0;
+      var mark = el("button", "choice", "Mark a DM sent (0/3)");
+      mark.type = "button";
+      mark.addEventListener("click", function () {
+        if (count === 0) dare(quest);
+        if (count < 3) count += 1;
+        state.questSteps = state.questSteps || {};
+        state.questSteps[quest.id] = count;
+        mark.textContent = "Mark a DM sent (" + count + "/3)";
+        status.textContent = count >= 3 ? "Three sent. Claim it." : "Keep going. This is the boring part.";
+      });
+      box.appendChild(mark);
+      var claimDm = el("button", "primary", "I sent 3 DMs");
+      claimDm.type = "button";
+      claimDm.addEventListener("click", function () {
+        finishQuest(quest, { steps: (state.questSteps && state.questSteps[quest.id]) || 0 });
+      });
+      box.appendChild(claimDm);
+    } else {
+      var filmed = el("button", "choice", "I hit record");
+      filmed.type = "button";
+      filmed.addEventListener("click", function () {
+        state.questOpened[quest.id] = true;
+        status.textContent = "Clock started in the real world. Come back when the minute exists.";
+        dare(quest);
+      });
+      box.appendChild(filmed);
+      var exists = el("button", "primary", "The 60 seconds exist");
+      exists.type = "button";
+      exists.addEventListener("click", function () { finishQuest(quest, { started: true }); });
+      box.appendChild(exists);
+    }
+    return box;
+  }
+
+  function finishQuest(quest, extra) {
+    var run = state.run;
+    extra = extra || {};
+    if (quest.kind === "post" || quest.kind === "video") {
+      extra.started = !!(extra.started && state.questOpened && state.questOpened[quest.id]);
+    }
+    var clock = loadQuestClock();
+    var result = HT.claimSideQuest(run, quest.id, extra, Date.now(), clock);
+    var status = document.getElementById("qstatus-" + quest.id);
+    if (!result.ok) {
+      var line = window.HT_GUIDE ? HT_GUIDE.sideQuestLine(result.reason, quest) : "Not yet.";
+      if (status) status.textContent = line;
+      if (window.HT_GUIDE) HT_GUIDE.say(line, "june");
+      return;
+    }
+    HT.markQuestClaim(run, quest.id, Date.now(), clock);
+    saveQuestClock(clock);
+    HT.playBeat(run, result.beat);
+    var cheer = window.HT_GUIDE ? HT_GUIDE.sideQuestLine("ok", quest, result.streak) : "Done.";
+    if (status) status.textContent = cheer;
+    if (window.HT_GUIDE) HT_GUIDE.say(cheer, "june");
+    paintTrail();
+    var streakLine = document.getElementById("quest-streak");
+    if (streakLine) streakLine.textContent = "Streak: " + (clock.streak || 1);
+  }
+
   function doHunt() {
     if (!state.run || state.run.phase !== "travel") return;
     var res = HT.beginHunt(state.run);
@@ -659,6 +929,7 @@
     if (run.phase === "result" && run.result) return "result:" + run.day + ":" + run.result.title + ":" + run.result.text.slice(0, 24);
     if (run.phase === "pitch") return "pitch:" + run.day;
     if (run.phase === "hunt") return "hunt:" + run.day + ":" + run.hunts;
+    if (run.phase === "scene" && run.scene && run.scene.def) return "scene:" + run.scene.def.id + ":" + run.scene.step;
     return "";
   }
 
@@ -669,11 +940,173 @@
     state.overlayKey = key;
     var old = document.getElementById("overlay");
     if (old) old.remove();
+    var open = !!key;
+    document.body.classList.toggle("overlay-open", open);
+    var guide = document.getElementById("guide");
+    if (guide && open) guide.classList.add("auto-min");
+    if (guide && !open) guide.classList.remove("auto-min");
     if (!key) return;
-    if (state.run.phase === "event") mountEvent();
+    if (state.run.phase === "scene") mountScene();
+    else if (state.run.phase === "event") mountEvent();
     else if (state.run.phase === "result") mountResult();
     else if (state.run.phase === "pitch") mountPitch();
     else if (state.run.phase === "hunt") mountHunt();
+  }
+
+  function juneAside(text) {
+    var row = el("div", "june-aside");
+    row.innerHTML = window.HT_GUIDE ? HT_GUIDE.avatarSvg() : "";
+    row.appendChild(el("p", null, text));
+    return row;
+  }
+
+  function mountScene() {
+    var run = state.run;
+    var scene = run.scene;
+    var def = scene.def;
+    var overlay = el("div");
+    overlay.id = "overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    var card = el("section", "card");
+    card.appendChild(el("p", "kicker", def.place || "A scene"));
+    card.appendChild(el("h2", null, def.title));
+    card.appendChild(stageFor(def));
+    card.appendChild(juneAside(scene.step === "done" && scene.juneLine ? scene.juneLine : def.brief));
+    var who = el("p", "kicker", def.npc.name + " · " + def.npc.role);
+    card.appendChild(who);
+    var spoken = scene.step === "done" && scene.npcLine ? scene.npcLine : def.line;
+    card.appendChild(el("p", "npc-line", spoken));
+    if (scene.step === "done" && scene.deltas) {
+      var deltas = el("div", "delta-row");
+      effectChips(scene.deltas).forEach(function (c) { deltas.appendChild(chip(c.text, c.tone)); });
+      card.appendChild(deltas);
+      var back = el("button", "primary", "Back on the trail");
+      back.type = "button";
+      back.addEventListener("click", function () {
+        HT_GUIDE.endSceneTravel(run);
+        afterChange();
+      });
+      card.appendChild(back);
+    } else {
+      var replies = el("div", "scene-replies");
+      def.replies.forEach(function (reply, index) {
+        var btn = el("button", "choice");
+        btn.type = "button";
+        btn.appendChild(el("span", "choice-label", (index + 1) + ". " + reply.label));
+        if (reply.detail) btn.appendChild(el("span", "choice-detail", reply.detail));
+        btn.addEventListener("click", function () { chooseScene(index); });
+        replies.appendChild(btn);
+      });
+      card.appendChild(replies);
+      var form = el("form", "g-form");
+      var mic = el("button", null, "Mic");
+      mic.type = "button";
+      mic.addEventListener("click", function () {
+        var real = document.getElementById("guide-mic");
+        if (real) real.click();
+      });
+      var input = el("input");
+      input.type = "text";
+      input.maxLength = 160;
+      input.placeholder = "Or say it your way";
+      var send = el("button", null, "Send");
+      send.type = "submit";
+      form.appendChild(mic);
+      form.appendChild(input);
+      form.appendChild(send);
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var text = input.value;
+        input.value = "";
+        if (window.HT_GUIDE) HT_GUIDE.sendText(text);
+      });
+      card.appendChild(form);
+    }
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    if (scene.step !== "done" && window.HT_GUIDE) HT_GUIDE.voiceNpc(scene);
+  }
+
+  function chooseScene(index) {
+    var run = state.run;
+    if (!run || run.phase !== "scene" || !run.scene || run.scene.step === "done") return;
+    var reply = run.scene.def.replies[index];
+    if (!reply) return;
+    if (reply.rumor) {
+      HT_GUIDE.noteChoice(reply.label, reply.june || "meh");
+      var truth = run.rng() < 0.55;
+      HT_GUIDE.openRumor(run, reply.rumor, truth);
+      run.scene.step = "done";
+      run.scene.npcLine = "Do not quote me. June has the rest.";
+      run.scene.juneLine = "Chase it in my chat, or leave it. Then get back on the wagon.";
+      run.scene.deltas = {};
+      state.overlayKey = "";
+      afterChange();
+      return;
+    }
+    var rolled = HT_SCENES.resolveReply(run, run.scene.def, reply);
+    var out = HT.playBeat(run, rolled.beat);
+    HT_GUIDE.noteChoice(reply.label, rolled.june || "meh");
+    if (rolled.juneLine) HT_GUIDE.say(rolled.juneLine, "june");
+    if (rolled.npcLine) HT_GUIDE.say(rolled.npcLine, run.scene.def.npc.voice);
+    if (run.phase !== "scene") {
+      state.overlayKey = "";
+      afterChange();
+      return;
+    }
+    run.scene.step = "done";
+    run.scene.npcLine = rolled.npcLine;
+    run.scene.juneLine = rolled.juneLine;
+    run.scene.deltas = out.deltas;
+    state.overlayKey = "";
+    afterChange();
+  }
+
+  function chooseCustom(hit) {
+    var run = state.run;
+    if (!run || run.phase !== "scene") return;
+    var out = HT.playBeat(run, hit.beat);
+    HT_GUIDE.noteChoice(hit.beat.choice || "Improvised", hit.june || "meh");
+    if (hit.juneLine) HT_GUIDE.say(hit.juneLine, "june");
+    if (hit.npcLine) HT_GUIDE.say(hit.npcLine, run.scene.def.npc.voice);
+    if (run.phase !== "scene") {
+      state.overlayKey = "";
+      afterChange();
+      return;
+    }
+    run.scene.step = "done";
+    run.scene.npcLine = hit.npcLine;
+    run.scene.juneLine = hit.juneLine;
+    run.scene.deltas = out.deltas;
+    state.overlayKey = "";
+    afterChange();
+  }
+
+  function stageFor(def) {
+    var stage = el("div", "stage " + (def.setting || "coffee"));
+    if (def.setting === "zoom") {
+      (def.cast || []).forEach(function (person) {
+        var tile = el("div", "tile" + (person.live ? " live" : ""));
+        tile.appendChild(el("div", "face", person.initials));
+        tile.appendChild(el("span", null, person.name));
+        stage.appendChild(tile);
+      });
+      return stage;
+    }
+    stage.appendChild(el("div", "banner", def.setting === "coffee" ? "Second Cup North" : def.setting === "hall" ? "KILN DEMO DAY" : def.setting === "board" ? "Board call" : "Founder meetup"));
+    if (def.setting === "coffee") {
+      var cups = el("div", "cups");
+      cups.appendChild(el("div", "cup"));
+      cups.appendChild(el("div", "cup"));
+      stage.appendChild(cups);
+    }
+    var face = el("div", "face", def.npc.initials);
+    face.style.position = "absolute";
+    face.style.left = "16px";
+    face.style.bottom = "16px";
+    stage.appendChild(face);
+    return stage;
   }
 
   function mountEvent() {
@@ -685,6 +1118,7 @@
     overlay.setAttribute("aria-modal", "true");
     var card = el("section", "card");
     card.appendChild(el("p", "kicker", ev.milestone ? "Milestone · mile " + Math.round(run.miles) : "Mile " + Math.round(run.miles) + " · " + HT.segmentInfo(run.miles).name));
+    if (window.HT_GUIDE) card.appendChild(juneAside(HT_GUIDE.briefEvent(run)));
     card.appendChild(el("h2", null, ev.title));
     card.appendChild(el("p", "body", ev.text));
     if (ev.timed) {
@@ -740,7 +1174,7 @@
 
   function effectChips(effects) {
     var out = [];
-    [["runway", "runway"], ["equity", "equity"], ["morale", "morale"], ["traction", "traction"]].forEach(function (pair) {
+    [["runway", "runway"], ["equity", "equity"], ["morale", "morale"], ["traction", "traction"], ["unicorn", "glow"]].forEach(function (pair) {
       var v = effects[pair[0]] || 0;
       if (!v) return;
       out.push({ text: signed(v) + " " + pair[1], tone: v > 0 ? "good" : "bad" });
@@ -975,6 +1409,7 @@
     var old = document.getElementById("overlay");
     if (old) old.remove();
     renderRecap();
+    if (window.HT_GUIDE) HT_GUIDE.onRecap(state.run);
     if (state.run.status === "won") fanfare();
     else dirge();
   }
@@ -997,7 +1432,7 @@
     card.appendChild(el("p", null, run.company + " · " + run.pitchLine));
     card.appendChild(el("p", "hint", "Day " + run.day + " · mile " + Math.round(run.miles) + " · " + HT.DIFFICULTIES[run.difficulty].label + (run.flags.raised ? " · raised" : " · never raised")));
     var grid = el("div", "grid-stats");
-    [["Runway", Math.round(run.runway)], ["Equity", Math.round(run.equity) + "%"], ["Morale", Math.round(run.morale)], ["Traction", Math.round(run.traction)]].forEach(function (pair) {
+    [["Runway", Math.round(run.runway)], ["Equity", Math.round(run.equity) + "%"], ["Morale", Math.round(run.morale)], ["Traction", Math.round(run.traction)], ["Unicorn Glow", Math.round(run.unicorn || 0)]].forEach(function (pair) {
       var cell = el("div");
       cell.appendChild(el("span", null, pair[0]));
       cell.appendChild(el("b", null, String(pair[1])));
@@ -1085,7 +1520,13 @@
     }
     if (state.screen !== "trail" || !state.run) return;
     var phase = state.run.phase;
-    if (phase === "event" && e.key >= "1" && e.key <= "4") {
+    if (phase === "scene" && e.key >= "1" && e.key <= "4") {
+      var si = Number(e.key) - 1;
+      if (state.run.scene && state.run.scene.def && state.run.scene.def.replies[si]) {
+        e.preventDefault();
+        chooseScene(si);
+      }
+    } else if (phase === "event" && e.key >= "1" && e.key <= "4") {
       var index = Number(e.key) - 1;
       if (state.run.pending && state.run.pending.choices[index]) {
         e.preventDefault();
@@ -1112,6 +1553,15 @@
   document.addEventListener("pointerdown", unlock);
 
   try {
+    if (window.HT_GUIDE) {
+      HT_GUIDE.mount();
+      window.HT_SCENE_PICK = function (hit) {
+        if (!hit) return;
+        if (hit.index != null) chooseScene(hit.index);
+        else chooseCustom(hit);
+      };
+      window.HT_UI_AFTER = function () { afterChange(); };
+    }
     render();
   } catch (err) {
     app.textContent = "The wagon failed to start. Reload the page.";

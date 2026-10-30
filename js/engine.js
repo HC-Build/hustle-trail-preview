@@ -146,7 +146,8 @@
       runway: game.runway,
       equity: game.equity,
       morale: game.morale,
-      traction: game.traction
+      traction: game.traction,
+      unicorn: game.unicorn || 0
     };
   }
 
@@ -155,7 +156,8 @@
       runway: effects.runway || 0,
       equity: effects.equity || 0,
       morale: effects.morale || 0,
-      traction: effects.traction || 0
+      traction: effects.traction || 0,
+      unicorn: effects.unicorn || 0
     };
     tags = tags || [];
     if (hasTrait(game, "shipper") && tags.indexOf("breakdown") >= 0 && d.runway < 0) {
@@ -175,6 +177,7 @@
     d.equity = Math.round(d.equity);
     d.morale = Math.round(d.morale);
     d.traction = Math.round(d.traction);
+    d.unicorn = Math.round(d.unicorn);
     return d;
   }
 
@@ -241,6 +244,7 @@
     game.equity = clamp(game.equity + d.equity, 0, 100);
     game.morale = clamp(game.morale + d.morale, 0, 100);
     game.traction = clamp(game.traction + d.traction, 0, 999);
+    game.unicorn = clamp((game.unicorn || 0) + (d.unicorn || 0), 0, 100);
     if (absolute) {
       if (absolute.runway != null) game.runway = round1(clamp(absolute.runway, 0, 100));
       if (absolute.equity != null) game.equity = clamp(absolute.equity, 0, 100);
@@ -251,7 +255,8 @@
       runway: round1(game.runway - before.runway),
       equity: game.equity - before.equity,
       morale: game.morale - before.morale,
-      traction: game.traction - before.traction
+      traction: game.traction - before.traction,
+      unicorn: (game.unicorn || 0) - (before.unicorn || 0)
     };
   }
 
@@ -291,7 +296,8 @@
       ["From runway", Math.round(game.runway * 2)],
       ["From morale", Math.round(game.morale * 1.5)],
       ["From the team", alive * 140],
-      ["From milestones", game.milestonesHit.length * 160]
+      ["From milestones", game.milestonesHit.length * 160],
+      ["From glow", Math.round((game.unicorn || 0) * 4)]
     ];
     var sub = parts.reduce(function (s, p) { return s + p[1]; }, 0);
     var ending = game.endingId ? DATA.ENDINGS[game.endingId] : null;
@@ -316,6 +322,7 @@
       morale: game.morale,
       cofounders: game.cofounders,
       milestonesHit: game.milestonesHit,
+      unicorn: game.unicorn || 0,
       day: game.day,
       difficulty: game.difficulty,
       status: "playing",
@@ -356,6 +363,9 @@
       status: "playing",
       endingId: null,
       flags: { raised: false, bootstrapped: false, snubbed: false },
+      story: {},
+      scenesSeen: [],
+      blockScenesUntilMile: 0,
       milestonesHit: [{ id: "garage", day: 1, mile: 0 }],
       seen: [],
       recent: [],
@@ -368,7 +378,9 @@
       suppressEvents: false,
       earlyExit: false,
       rng: rng,
-      score: 0
+      score: 0,
+      unicorn: 0,
+      sideClaims: []
     };
     pushLog(game, warmIntro
       ? "A warm intro bought a nod. Your slice of the company is already smaller."
@@ -484,13 +496,183 @@
   }
 
   function payloadDeltas(game, before) {
-    if (!before) return { runway: 0, equity: 0, morale: 0, traction: 0 };
+    if (!before) return { runway: 0, equity: 0, morale: 0, traction: 0, unicorn: 0 };
     return {
       runway: round1(game.runway - before.runway),
       equity: game.equity - before.equity,
       morale: game.morale - before.morale,
-      traction: game.traction - before.traction
+      traction: game.traction - before.traction,
+      unicorn: (game.unicorn || 0) - (before.unicorn || 0)
     };
+  }
+
+  function questById(id) {
+    var list = (DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.entries) || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  function isRealUrl(url) {
+    return /^https?:\/\//i.test(url || "") && String(url).indexOf("PASTE_") !== 0;
+  }
+
+  function publicGameUrl() {
+    var configured = DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.gameUrl;
+    if (isRealUrl(configured)) return configured;
+    if (typeof location !== "undefined" && location.href) return location.href.split("#")[0];
+    return "";
+  }
+
+  function shareText(game, take) {
+    var link = publicGameUrl();
+    var body = take
+      ? take + " #HustleTrail"
+      : (game.company || "A wagon") + " is on the Hustle Trail. Mile " + Math.round(game.miles || 0) + ", score " + (game.score || 0) + ". #HustleTrail";
+    if (link) body += " " + link;
+    return body;
+  }
+
+  function intentPostUrl(text) {
+    return "https://x.com/intent/post?text=" + encodeURIComponent(text);
+  }
+
+  function fillDraft(game, template) {
+    return String(template || "")
+      .replace(/\{company\}/g, game.company || "the wagon")
+      .replace(/\{mile\}/g, String(Math.round(game.miles || 0)))
+      .replace(/\{score\}/g, String(game.score || 0))
+      .replace(/\{pitch\}/g, game.pitchLine || "the product");
+  }
+
+  function channelUrl(channel, text) {
+    if (channel === "x") return intentPostUrl(text);
+    if (channel === "linkedin") {
+      var page = publicGameUrl();
+      if (!page) return "";
+      return "https://www.linkedin.com/sharing/share-offsite/?url=" + encodeURIComponent(page);
+    }
+    return "";
+  }
+
+  function nextStreak(clock, now) {
+    var windowMs = (DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.streakWindowMs) || 0;
+    var prev = clock.lastClaimAt || 0;
+    if (prev && windowMs && now - prev <= windowMs && now - prev > 1000) return (clock.streak || 1) + 1;
+    if (prev && now - prev <= 1000) return clock.streak || 1;
+    return prev ? 1 : 1;
+  }
+
+  function claimSideQuest(game, id, extra, now, clockStore) {
+    extra = extra || {};
+    now = now || Date.now();
+    var quest = questById(id);
+    if (!quest) return { ok: false, reason: "missing" };
+    game.sideClaims = game.sideClaims || [];
+    if (game.sideClaims.indexOf(id) >= 0) return { ok: false, reason: "cooldown", quest: quest };
+    var saved = clockStore || { at: {}, globalAt: 0, streak: 0, lastClaimAt: 0 };
+    var wait = (DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.cooldownMs) || 0;
+    var last = saved.at && saved.at[id];
+    if (last && now - last < wait) return { ok: false, reason: "cooldown", quest: quest, waitMs: wait - (now - last) };
+    if (saved.globalAt && now - saved.globalAt < 45000 && now - saved.globalAt > 0) {
+      return { ok: false, reason: "cooldown", quest: quest, waitMs: 45000 - (now - saved.globalAt) };
+    }
+    if (quest.kind === "dm") {
+      if ((extra.steps || 0) < (quest.steps || 3)) return { ok: false, reason: "closed", quest: quest };
+    } else if (quest.kind === "comment") {
+      if (String(extra.note || "").trim().length < (quest.minLength || 24)) return { ok: false, reason: "short", quest: quest };
+      if (!extra.done) return { ok: false, reason: "closed", quest: quest };
+    } else if (!extra.started) {
+      return { ok: false, reason: "closed", quest: quest };
+    }
+    var rewards = Object.assign({}, quest.rewards || {});
+    var streak = 1;
+    if (saved.lastClaimAt && (DATA.SIDE_QUESTS.streakWindowMs || 0) && now - saved.lastClaimAt <= DATA.SIDE_QUESTS.streakWindowMs && now - saved.lastClaimAt > 1000) {
+      streak = (saved.streak || 1) + 1;
+    }
+    if (streak >= 2) rewards.traction = (rewards.traction || 0) + 2;
+    return {
+      ok: true,
+      reason: "ok",
+      quest: quest,
+      streak: streak,
+      beat: {
+        title: quest.title,
+        choice: quest.title,
+        effects: rewards,
+        text: quest.title,
+        log: "Side quest: " + quest.title,
+        tone: "good"
+      }
+    };
+  }
+
+  function watchClipId(index) {
+    return "watch-clip-" + index;
+  }
+
+  function watchClips() {
+    if (DATA.WATCH_CLIPS && DATA.WATCH_CLIPS.length) return DATA.WATCH_CLIPS;
+    return (DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.clips) || [];
+  }
+
+  function claimWatchClip(game, index, extra, now, clockStore) {
+    extra = extra || {};
+    now = now || Date.now();
+    var clips = watchClips();
+    var clip = clips[index];
+    if (!clip) return { ok: false, reason: "missing" };
+    var id = watchClipId(index);
+    if (!isRealUrl(clip.url)) return { ok: false, reason: "placeholder", clip: clip, id: id };
+    game.sideClaims = game.sideClaims || [];
+    var saved = clockStore || { at: {}, globalAt: 0, streak: 0, lastClaimAt: 0 };
+    if ((saved.at && saved.at[id]) || game.sideClaims.indexOf(id) >= 0) {
+      return { ok: false, reason: "once", clip: clip, id: id };
+    }
+    if (!extra.opened) return { ok: false, reason: "closed", clip: clip, id: id };
+    if (String(extra.note || "").trim().length < 8) return { ok: false, reason: "short", clip: clip, id: id };
+    var rewards = Object.assign({}, clip.reward || {});
+    var streak = 1;
+    var windowMs = (DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.streakWindowMs) || 0;
+    if (saved.lastClaimAt && windowMs && now - saved.lastClaimAt <= windowMs && now - saved.lastClaimAt > 1000) {
+      streak = (saved.streak || 1) + 1;
+    }
+    if (streak >= 2) rewards.traction = (rewards.traction || 0) + 2;
+    if (extra.bonus) {
+      Object.keys(extra.bonus).forEach(function (k) {
+        rewards[k] = (rewards[k] || 0) + extra.bonus[k];
+      });
+    }
+    return {
+      ok: true,
+      reason: "ok",
+      clip: clip,
+      id: id,
+      streak: streak,
+      beat: {
+        title: clip.title,
+        choice: "Watched and commented",
+        effects: rewards,
+        text: clip.lesson || clip.title,
+        log: "Watch and engage: " + clip.title,
+        tone: "good"
+      }
+    };
+  }
+
+  function markQuestClaim(game, id, now, clockStore) {
+    now = now || Date.now();
+    game.sideClaims = game.sideClaims || [];
+    if (game.sideClaims.indexOf(id) < 0) game.sideClaims.push(id);
+    if (!clockStore) return;
+    var windowMs = (DATA.SIDE_QUESTS && DATA.SIDE_QUESTS.streakWindowMs) || 0;
+    var prev = clockStore.lastClaimAt || 0;
+    if (prev && windowMs && now - prev <= windowMs && now - prev > 1000) clockStore.streak = (clockStore.streak || 1) + 1;
+    else clockStore.streak = 1;
+    clockStore.lastClaimAt = now;
+    clockStore.at = clockStore.at || {};
+    clockStore.at[id] = now;
+    clockStore.globalAt = now;
+    game.questStreak = clockStore.streak;
   }
 
   function applyFlags(game, flags) {
@@ -898,6 +1080,43 @@
     return DATA.QUOTES[i];
   }
 
+  function playBeat(game, spec) {
+    spec = spec || {};
+    var before = snap(game);
+    game._before = before;
+    applyNumbers(game, spec.effects || {}, spec.tags || [], spec.absolute || null);
+    var raisedNow = applyFlags(game, spec.flags);
+    if (spec.story) {
+      game.story = game.story || {};
+      Object.keys(spec.story).forEach(function (k) { game.story[k] = spec.story[k]; });
+    }
+    var text = spec.text || "";
+    if (raisedNow) text += " This counts as raising. Quiet Wealth is off the table.";
+    var quits = [];
+    if (spec.quit) {
+      var q = maybeQuit(game, spec.quit);
+      if (q) quits.push(q);
+      if (q) text += " " + q.name + " " + q.reason + ".";
+    }
+    game._quits = quits;
+    game.history.push({
+      day: game.day,
+      title: spec.title || "A beat",
+      choice: spec.choice || "",
+      result: text
+    });
+    if (game.history.length > 30) game.history.shift();
+    var death = checkDeath(game);
+    if (death) {
+      pushLog(game, DATA.ENDINGS[death].title + ".", "bad");
+      kill(game, death, text);
+      return { fatal: true, endingId: death, deltas: payloadDeltas(game, before), quits: quits, text: text };
+    }
+    if (spec.log) pushLog(game, spec.log, spec.tone || "");
+    touchScore(game);
+    return { fatal: false, deltas: payloadDeltas(game, before), quits: quits, text: text };
+  }
+
   function goals(game) {
     var next = nextMilestone(game);
     return DATA.MILESTONES.filter(function (m) { return m.mile > 0; }).map(function (m) {
@@ -941,6 +1160,19 @@
     shapeDelta: shapeDelta,
     dailyBurn: dailyBurn,
     campCost: campCost,
-    hasTrait: hasTrait
+    hasTrait: hasTrait,
+    playBeat: playBeat,
+    claimSideQuest: claimSideQuest,
+    markQuestClaim: markQuestClaim,
+    shareText: shareText,
+    intentPostUrl: intentPostUrl,
+    isRealUrl: isRealUrl,
+    publicGameUrl: publicGameUrl,
+    fillDraft: fillDraft,
+    channelUrl: channelUrl,
+    nextStreak: nextStreak,
+    claimWatchClip: claimWatchClip,
+    watchClipId: watchClipId,
+    watchClips: watchClips
   };
 });
