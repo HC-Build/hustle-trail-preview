@@ -159,7 +159,13 @@
     return wrap;
   }
 
+  function markScreen() {
+    document.body.classList.remove("screen-title", "screen-setup", "screen-trail", "screen-recap");
+    if (state.screen) document.body.classList.add("screen-" + state.screen);
+  }
+
   function render() {
+    markScreen();
     if (state.screen === "title") renderTitle();
     else if (state.screen === "setup") renderSetup();
     else if (state.screen === "trail") renderTrail();
@@ -167,6 +173,7 @@
   }
 
   function renderTitle() {
+    markScreen();
     app.replaceChildren();
     var wrap = el("div", "title-screen");
     wrap.appendChild(toolbar());
@@ -223,6 +230,7 @@
   }
 
   function renderSetup() {
+    markScreen();
     app.replaceChildren();
     var wrap = el("div", "setup-screen");
     wrap.appendChild(toolbar());
@@ -419,6 +427,7 @@
   }
 
   function renderTrail() {
+    markScreen();
     var run = state.run;
     app.replaceChildren();
     var root = el("div", "trail");
@@ -821,8 +830,6 @@
     if (old) old.remove();
     state.overlayKey = "";
     document.body.classList.remove("overlay-open");
-    var guide = document.getElementById("guide");
-    if (guide) guide.classList.remove("auto-min");
     if (state.run && state.run.phase === "travel") state.run.paused = false;
     paintTrail();
   }
@@ -832,8 +839,6 @@
     var old = document.getElementById("overlay");
     if (old) old.remove();
     document.body.classList.add("overlay-open");
-    var guide = document.getElementById("guide");
-    if (guide) guide.classList.add("auto-min");
     var overlay = el("div");
     overlay.id = "overlay";
     var card = el("section", "card");
@@ -1084,8 +1089,6 @@
     if (old) old.remove();
     var open = !!key;
     document.body.classList.toggle("overlay-open", open);
-    var guide = document.getElementById("guide");
-    if (guide) guide.classList.remove("auto-min");
     if (!key) return;
     if (state.run.phase === "scene") mountScene();
     else if (state.run.phase === "meeting") mountMeeting();
@@ -1717,6 +1720,7 @@
   }
 
   function renderRecap() {
+    markScreen();
     var run = state.run;
     var ending = HT.DATA.ENDINGS[run.endingId];
     var parts = run.scoreReport || HT.scoreParts(run);

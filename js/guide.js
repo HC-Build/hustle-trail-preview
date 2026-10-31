@@ -606,7 +606,9 @@
 
   function paintTalking(on) {
     var av = document.getElementById("guide-avatar");
+    var launch = document.getElementById("june-launch");
     if (av) av.classList.toggle("talking", !!on);
+    if (launch) launch.classList.toggle("talking", !!on);
   }
 
   function paintMood() {
@@ -632,6 +634,47 @@
     row.textContent = label + ": " + text;
     log.appendChild(row);
     log.scrollTop = log.scrollHeight;
+    if (who !== "you") markUnread();
+  }
+
+  var OPEN_KEY = "hustle-june-open";
+
+  function guideIsOpen() {
+    var guide = document.getElementById("guide");
+    return !!(guide && !guide.classList.contains("closed"));
+  }
+
+  function readOpen() {
+    try { return sessionStorage.getItem(OPEN_KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function writeOpen(on) {
+    try { sessionStorage.setItem(OPEN_KEY, on ? "1" : "0"); } catch (e) {}
+  }
+
+  function markUnread() {
+    if (guideIsOpen()) return;
+    var dot = document.getElementById("june-unread");
+    if (dot) dot.hidden = false;
+  }
+
+  function clearUnread() {
+    var dot = document.getElementById("june-unread");
+    if (dot) dot.hidden = true;
+  }
+
+  function setGuideOpen(on) {
+    var guide = document.getElementById("guide");
+    var launch = document.getElementById("june-launch");
+    if (!guide) return;
+    guide.classList.toggle("closed", !on);
+    document.body.classList.toggle("guide-open", !!on);
+    if (launch) {
+      launch.setAttribute("aria-expanded", on ? "true" : "false");
+      launch.setAttribute("aria-label", on ? "Close June" : "Open June");
+    }
+    if (on) clearUnread();
+    writeOpen(!!on);
   }
 
   function say(text, who, opts) {
@@ -751,11 +794,6 @@
     memory = blankMemory();
     say(welcome(game), "june");
     paintMood();
-    var shell = document.getElementById("guide");
-    if (shell) {
-      shell.classList.remove("min");
-      document.body.classList.add("guide-open");
-    }
   }
 
   function onScreen(screen) {
@@ -937,16 +975,26 @@
       window.speechSynthesis.onvoiceschanged = refreshVoices;
       setTimeout(refreshVoices, 300);
     }
+    var dock = document.createElement("div");
+    dock.id = "june-dock";
+    var launch = document.createElement("button");
+    launch.type = "button";
+    launch.id = "june-launch";
+    launch.setAttribute("aria-controls", "guide");
+    launch.innerHTML = ""
+      + "<span class='june-face' id='june-face'></span>"
+      + "<span class='june-badge' aria-hidden='true'><svg viewBox='0 0 16 16'><path d='M1.5 2.5h13v8.2H6.2L2.8 14V2.5z'/></svg></span>"
+      + "<span class='june-unread' id='june-unread' hidden></span>";
     var aside = document.createElement("aside");
     aside.id = "guide";
-    aside.className = "guide";
+    aside.className = "guide closed";
     aside.setAttribute("aria-label", "June Harlow, trail boss");
     aside.innerHTML = ""
       + "<header class='g-head'>"
-      + "<button type='button' class='g-avatar' id='guide-avatar' aria-label='Show or hide June'></button>"
+      + "<span class='g-avatar' id='guide-avatar' aria-hidden='true'></span>"
       + "<div class='g-id'><strong>June Harlow</strong><span id='guide-mood'>Unimpressed, on purpose</span></div>"
       + "<button type='button' class='g-voice' id='guide-voice'></button>"
-      + "<button type='button' class='g-min' id='guide-min'>Hide</button>"
+      + "<button type='button' class='g-x' id='guide-close' aria-label='Close June'>X</button>"
       + "</header>"
       + "<button type='button' class='g-tap' id='guide-tap' hidden>Tap to let June talk</button>"
       + "<div class='g-log' id='guide-log' aria-live='polite'></div>"
@@ -961,8 +1009,12 @@
       + "<button type='submit'>Send</button>"
       + "</form>"
       + "<p class='g-micstatus' id='guide-micstatus'></p>";
-    document.body.appendChild(aside);
+    dock.appendChild(aside);
+    dock.appendChild(launch);
+    document.body.appendChild(dock);
     document.getElementById("guide-avatar").innerHTML = avatarSvg();
+    document.getElementById("june-face").innerHTML = avatarSvg();
+    setGuideOpen(readOpen());
     setVoice(voiceOn);
     var quick = document.getElementById("guide-quick");
     ["What should I do?", "Explain this", "Tell me a story"].forEach(function (label) {
@@ -980,20 +1032,14 @@
       setVoice(!voiceOn);
       if (voiceOn) say("Voice on. I will keep the opinions.", "june");
     });
-    document.getElementById("guide-min").addEventListener("click", function () {
-      aside.classList.toggle("min");
-      document.body.classList.toggle("guide-open", !aside.classList.contains("min"));
-      document.getElementById("guide-min").textContent = aside.classList.contains("min") ? "June" : "Hide";
-    });
-    document.getElementById("guide-avatar").addEventListener("click", function () {
+    document.getElementById("guide-close").addEventListener("click", function () {
       primeFromGesture();
-      if (document.body.classList.contains("overlay-open")) {
-        aside.classList.toggle("auto-min");
-        return;
-      }
-      aside.classList.toggle("min");
-      document.body.classList.toggle("guide-open", !aside.classList.contains("min"));
-      if (!aside.classList.contains("min") && queue.length) primeFromGesture();
+      setGuideOpen(false);
+    });
+    launch.addEventListener("click", function () {
+      primeFromGesture();
+      setGuideOpen(!guideIsOpen());
+      if (guideIsOpen() && queue.length) primeFromGesture();
     });
     document.getElementById("guide-tap").addEventListener("click", function () {
       primeFromGesture();
@@ -1014,7 +1060,6 @@
     document.getElementById("rumor-act").addEventListener("click", function () { primeFromGesture(); actRumor("act"); });
     document.getElementById("rumor-leave").addEventListener("click", function () { primeFromGesture(); actRumor("leave"); });
     wireMic();
-    document.body.classList.add("guide-open");
     document.addEventListener("pointerdown", primeFromGesture);
   }
 
